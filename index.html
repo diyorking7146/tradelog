@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+  <meta name="theme-color" content="#080c14" id="themeColorMeta"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="TradeLog Pro"/>
+  <title>TradeLog Pro</title>
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%23080c14'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E📈%3C/text%3E%3C/svg%3E"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:#080c14;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+    #root{height:100%;width:100%}
+  </style>
+</head>
+<body>
+<div id="root">
+  <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#080c14;flex-direction:column;gap:12px">
+    <div style="font-size:48px">📈</div>
+    <div style="color:#3b82f6;font-size:20px;font-weight:800;font-family:system-ui">TradeLog Pro</div>
+    <div style="color:#64748b;font-size:13px">Loading…</div>
+  </div>
+</div>
+
+<!-- React 18 -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<!-- Babel for JSX -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Recharts -->
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+
+<script>
+// PWA Manifest
+const manifest={name:"TradeLog Pro",short_name:"TradeLog",start_url:"./",display:"standalone",background_color:"#080c14",theme_color:"#080c14",orientation:"portrait-primary",icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%23080c14'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E📈%3C/text%3E%3C/svg%3E",sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}]};
+const mb=new Blob([JSON.stringify(manifest)],{type:"application/json"});
+const ml=document.createElement("link");ml.rel="manifest";ml.href=URL.createObjectURL(mb);document.head.appendChild(ml);
+// Service Worker
+const SW=`const C='tlp-v1';self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request)));});`;
+if('serviceWorker'in navigator)navigator.serviceWorker.register(URL.createObjectURL(new Blob([SW],{type:"application/javascript"}))).catch(()=>{});
+// Install prompt
+window.__ip=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__ip=e;window.dispatchEvent(new CustomEvent('installready'));});
+</script>
+
+<script type="text/babel" data-presets="react">
+const{AreaChart,Area,BarChart,Bar,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,ReferenceLine,ScatterChart,Scatter}=Recharts;
+const{useState,useEffect,useMemo,useCallback,useRef}=React;
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine, ScatterChart, Scatter
+} from "recharts";
+
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS & THEME
+// ═══════════════════════════════════════════════════════════
+// All surface/text colours are CSS variables so the dark↔light
+// toggle applies everywhere instantly (inline styles use var()).
+const G = {
+  bg:     "var(--bg)",
+  panel:  "var(--panel)",
+  panel2: "var(--panel2)",
+  border: "var(--border)",
+  text:   "var(--text)",
+  muted:  "var(--muted)",
+  dim:    "var(--dim)",
+  input:  "var(--input)",
+  // brand colours stay fixed in both themes
+  accent: "#3b82f6",
+  green:  "#22c55e",
+  red:    "#ef4444",
+  yellow: "#f59e0b",
+  purple: "#a78bfa",
+  cyan:   "#06b6d4",
+  orange: "#f97316",
+};
+
+const DARK  = { "--bg":"#080c14","--panel":"#0f1623","--panel2":"#141e2e","--border":"#1e293b","--text":"#f1f5f9","--muted":"#64748b","--dim":"#334155","--input":"#070b12","--scrollbar-track":"#080c14","--scrollbar-thumb":"#1e293b" };
+const LIGHT = { "--bg":"#f0f4f8","--panel":"#ffffff","--panel2":"#f8fafc","--border":"#e2e8f0","--text":"#0f172a","--muted":"#64748b","--dim":"#94a3b8","--input":"#f1f5f9","--scrollbar-track":"#e2e8f0","--scrollbar-thumb":"#94a3b8" };
+const STRATEGIES = ["Inside Bar","Breakout","Gap & Go","ORB","Trend Follow","Reversal","Momentum","Scalp","Swing","VWAP Reclaim","EMA Cross"];
+const SESSIONS   = ["Pre-Market","Regular","After-Hours"];
+const SECTORS    = ["Technology","Healthcare","Energy","Finance","Consumer","Industrial","Materials","Utilities","Real Estate","Comm Svcs"];
+const ALL_TAGS   = ["A+ Setup","FOMO","Revenge","News Catalyst","Earnings","High Volume","Low Float","Sector Play","Watchlist","Oversold","Overbought"];
+const CHECKLIST  = ["Is the market/sector trending in my direction?","Is there a clear catalyst or reason for the move?","Is my risk defined with a stop below/above a key level?"];
+const ECON_EVENTS = [
+  {date:"2026-06-11",event:"FOMC Rate Decision",impact:"high",time:"2:00 PM ET"},
+  {date:"2026-06-06",event:"Non-Farm Payrolls",impact:"high",time:"8:30 AM ET"},
+  {date:"2026-06-12",event:"CPI Inflation Data",impact:"high",time:"8:30 AM ET"},
+  {date:"2026-06-17",event:"Retail Sales",impact:"med",time:"8:30 AM ET"},
+  {date:"2026-06-25",event:"GDP (Final Q1)",impact:"med",time:"8:30 AM ET"},
+  {date:"2026-07-01",event:"ISM Manufacturing",impact:"med",time:"10:00 AM ET"},
+  {date:"2026-07-08",event:"FOMC Minutes",impact:"med",time:"2:00 PM ET"},
+  {date:"2026-07-10",event:"PPI Inflation",impact:"med",time:"8:30 AM ET"},
+];
+const SK = { trades:"tlp-v4-trades", watchlist:"tlp-v4-watch", playbook:"tlp-v4-play", settings:"tlp-v4-cfg", reviews:"tlp-v4-rev" };
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+const uid   = () => Math.random().toString(36).slice(2,9);
+const money = v => (v>=0?"+":"-")+"$"+Math.abs(v).toFixed(2);
+const pct   = v => (v>=0?"+":"")+v.toFixed(2)+"%";
+const pnl   = t => parseFloat(((t.side==="Long"?t.exit-t.entry:t.entry-t.exit)*t.qty-(t.fees||0)).toFixed(2));
+const today = () => new Date().toISOString().slice(0,10);
+const wk    = d => { const dt=new Date(d); dt.setDate(dt.getDate()-dt.getDay()); return dt.toISOString().slice(0,10); };
+
+async function stor(key, val) {
+  try {
+    if (val===undefined) { const r=await window.storage.get(key); return r?.value?JSON.parse(r.value):null; }
+    await window.storage.set(key, JSON.stringify(val)); return true;
+  } catch(_){ return null; }
+}
+
+async function compressImage(dataUrl, maxW=800) {
+  return new Promise(res=>{
+    const img=new Image(); img.onload=()=>{
+      const scale=Math.min(1,maxW/img.width);
+      const c=document.createElement("canvas"); c.width=img.width*scale; c.height=img.height*scale;
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL("image/jpeg",0.7));
+    }; img.src=dataUrl;
+  });
+}
+
+const SEED = [
+  {id:"s1",date:"2026-05-01",symbol:"AAPL",side:"Long",entry:171.2,exit:175.8,qty:50,fees:2.5,strategy:"Inside Bar",session:"Regular",sector:"Technology",tags:["A+ Setup"],r:2.1,notes:"Clean IB on daily, sector strong.",checklist:[true,true,true],screenshot:null},
+  {id:"s2",date:"2026-05-02",symbol:"BTU", side:"Long",entry:13.4, exit:14.1, qty:200,fees:3,  strategy:"Breakout",    session:"Regular",sector:"Energy",    tags:["High Volume"],r:1.8,notes:"Energy breakout above resistance.",checklist:[true,true,true],screenshot:null},
+  {id:"s3",date:"2026-05-05",symbol:"BBIO",side:"Short",entry:22.1,exit:20.5, qty:100,fees:2,  strategy:"Reversal",    session:"Regular",sector:"Healthcare",tags:["Sector Play"],r:2.4,notes:"Biotech reversal at key zone.",checklist:[true,false,true],screenshot:null},
+  {id:"s4",date:"2026-05-06",symbol:"MU",  side:"Long",entry:98.5, exit:96.0, qty:30, fees:2,  strategy:"Breakout",    session:"Regular",sector:"Technology",tags:["FOMO"],r:-1, notes:"Chased entry, no clear level.",checklist:[false,true,false],screenshot:null},
+  {id:"s5",date:"2026-05-07",symbol:"ABT", side:"Long",entry:115.0,exit:118.5,qty:40, fees:2,  strategy:"Inside Bar",  session:"Regular",sector:"Healthcare",tags:["A+ Setup"],r:2.2,notes:"Perfect IB setup at support.",checklist:[true,true,true],screenshot:null},
+  {id:"s6",date:"2026-05-08",symbol:"ZS",  side:"Long",entry:195.0,exit:201.0,qty:20, fees:2,  strategy:"Trend Follow",session:"Regular",sector:"Technology",tags:["Watchlist"],r:1.9,notes:"Good trend continuation.",checklist:[true,true,true],screenshot:null},
+  {id:"s7",date:"2026-05-09",symbol:"PBF", side:"Short",entry:38.2,exit:35.0, qty:80, fees:2,  strategy:"Inside Bar",  session:"Regular",sector:"Energy",    tags:["A+ Setup"],r:2.5,notes:"Energy short, clean IB.",checklist:[true,true,true],screenshot:null},
+  {id:"s8",date:"2026-05-12",symbol:"NVDA",side:"Long",entry:875.0,exit:860.0,qty:5,  fees:2,  strategy:"Gap & Go",    session:"Pre-Market",sector:"Technology",tags:["FOMO"],r:-0.8,notes:"Missed my entry level.",checklist:[false,true,false],screenshot:null},
+  {id:"s9",date:"2026-05-13",symbol:"TSLA",side:"Short",entry:175.0,exit:170.0,qty:30,fees:2,  strategy:"ORB",         session:"Regular",sector:"Technology",tags:["Watchlist"],r:2.0,notes:"Clean ORB short setup.",checklist:[true,true,true],screenshot:null},
+  {id:"s10",date:"2026-05-14",symbol:"AMD",side:"Long",entry:152.0,exit:158.0,qty:25, fees:2,  strategy:"Breakout",    session:"Regular",sector:"Technology",tags:["A+ Setup"],r:2.3,notes:"Sector momentum breakout.",checklist:[true,true,true],screenshot:null},
+];
+
+// ═══════════════════════════════════════════════════════════
+// UI ATOMS
+// ═══════════════════════════════════════════════════════════
+const Card = ({children,style={}}) => <div style={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:12,...style}}>{children}</div>;
+const Card2 = ({children,style={}}) => <div style={{background:G.panel2,border:`1px solid ${G.border}`,borderRadius:10,...style}}>{children}</div>;
+
+function Btn({children,onClick,color=G.accent,ghost=false,danger=false,sm=false,full=false,disabled=false,style={}}) {
+  const bg   = danger?G.red+"22":ghost?"transparent":color;
+  const tc   = danger?G.red:ghost?color:color===G.accent||color===G.green||color===G.red||color===G.purple?"#000":"#000";
+  const real_tc = ghost||danger?( danger?G.red:color):"#000";
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{background:bg,color:real_tc,border:`1px solid ${danger?G.red+"66":ghost?color+"55":"transparent"}`,
+        borderRadius:8,padding:sm?"5px 12px":"9px 20px",fontWeight:700,fontSize:sm?11:13,
+        cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.5:1,fontFamily:"inherit",
+        width:full?"100%":undefined,transition:"opacity .15s",...style}}>
+      {children}
+    </button>
+  );
+}
+
+const Badge = ({label,color=G.accent,sm=false}) => (
+  <span style={{background:color+"22",color,border:`1px solid ${color}44`,borderRadius:20,
+    padding:sm?"2px 8px":"3px 10px",fontSize:sm?10:11,fontWeight:700,whiteSpace:"nowrap"}}>{label}</span>
+);
+
+function KPI({label,value,color,sub}) {
+  return (
+    <Card style={{padding:"16px 18px"}}>
+      <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",marginBottom:6}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:800,color:color||G.text,fontFamily:"monospace"}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:G.muted,marginTop:3}}>{sub}</div>}
+    </Card>
+  );
+}
+
+function Confirm({text,onOk,onCancel}) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000c",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <Card style={{padding:28,maxWidth:360,width:"90%",textAlign:"center",border:`1px solid ${G.red}55`,boxShadow:`0 0 40px ${G.red}18`}}>
+        <div style={{fontSize:32,marginBottom:10}}>🗑️</div>
+        <div style={{fontSize:15,fontWeight:700,color:G.text,marginBottom:6}}>Delete?</div>
+        <div style={{fontSize:12,color:G.muted,marginBottom:20,lineHeight:1.6}}>{text}</div>
+        <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+          <Btn ghost onClick={onCancel}>Cancel</Btn>
+          <Btn danger onClick={onOk}>Yes, Delete</Btn>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function Modal({title,onClose,children,wide=false,maxW}) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000b",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:12}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:16,width:"100%",maxWidth:maxW||( wide?1080:740),maxHeight:"93vh",overflowY:"auto",boxShadow:"0 25px 60px #0008"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 22px",borderBottom:`1px solid ${G.border}`,position:"sticky",top:0,background:G.panel,zIndex:2}}>
+          <span style={{fontWeight:700,fontSize:16,color:G.text}}>{title}</span>
+          <button onClick={onClose} style={{background:"none",border:"none",color:G.muted,fontSize:26,cursor:"pointer",lineHeight:1,padding:"0 4px"}}>×</button>
+        </div>
+        <div style={{padding:22}}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Tabs({tabs,active,onChange}) {
+  return (
+    <div style={{display:"flex",borderBottom:`1px solid ${G.border}`,gap:0,overflowX:"auto"}}>
+      {tabs.map(t=>(
+        <button key={t.id} onClick={()=>onChange(t.id)}
+          style={{background:active===t.id?G.accent+"18":"transparent",color:active===t.id?G.accent:G.muted,
+            border:"none",borderBottom:active===t.id?`2px solid ${G.accent}`:"2px solid transparent",
+            padding:"10px 16px",cursor:"pointer",fontWeight:600,fontSize:12,display:"flex",
+            alignItems:"center",gap:5,fontFamily:"inherit",whiteSpace:"nowrap",transition:"all .2s"}}>
+          {t.icon} {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIVE PRICE HOOK (Finnhub)
+// ═══════════════════════════════════════════════════════════
+function usePrices(symbols, apiKey) {
+  const [prices, setPrices] = useState({});
+  useEffect(()=>{
+    if (!apiKey||!symbols.length) return;
+    let alive=true;
+    const fetch_all=async()=>{
+      const results={};
+      for(const sym of symbols.slice(0,10)){
+        try{
+          const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${apiKey}`);
+          const d=await r.json();
+          if(d.c) results[sym]={price:d.c,change:d.d,changePct:d.dp,high:d.h,low:d.l,open:d.o,prevClose:d.pc};
+        }catch(_){}
+        await new Promise(r=>setTimeout(r,200));
+      }
+      if(alive) setPrices(results);
+    };
+    fetch_all();
+    const iv=setInterval(fetch_all,30000);
+    return()=>{ alive=false; clearInterval(iv); };
+  },[symbols.join(","),apiKey]);
+  return prices;
+}
+
+// ═══════════════════════════════════════════════════════════
+// FEAR & GREED
+// ═══════════════════════════════════════════════════════════
+function useFearGreed() {
+  const [fg, setFg] = useState(null);
+  useEffect(()=>{
+    fetch("https://api.alternative.me/fng/?limit=1")
+      .then(r=>r.json()).then(d=>{ if(d?.data?.[0]) setFg(d.data[0]); }).catch(()=>{});
+  },[]);
+  return fg;
+}
+
+function FearGreedWidget({fg}) {
+  if (!fg) return (
+    <Card style={{padding:16,textAlign:"center"}}>
+      <div style={{fontSize:11,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",marginBottom:8}}>Fear & Greed Index</div>
+      <div style={{fontSize:12,color:G.muted}}>Loading…</div>
+    </Card>
+  );
+  const v=parseInt(fg.value);
+  const label=fg.value_classification;
+  const color=v<=25?G.red:v<=45?G.orange:v<=55?G.yellow:v<=75?G.green:"#00ff88";
+  const deg=((v/100)*180)-90;
+  return (
+    <Card style={{padding:16,textAlign:"center"}}>
+      <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",marginBottom:10}}>Fear & Greed Index</div>
+      <div style={{position:"relative",width:100,height:50,margin:"0 auto 8px"}}>
+        <svg width="100" height="55" viewBox="0 0 100 55">
+          <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke={G.border} strokeWidth="8" strokeLinecap="round"/>
+          <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={`${v*1.257} 200`}/>
+          <line x1="50" y1="50" x2={50+35*Math.cos((deg-90)*Math.PI/180)} y2={50+35*Math.sin((deg-90)*Math.PI/180)}
+            stroke={color} strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </div>
+      <div style={{fontSize:28,fontWeight:800,color,fontFamily:"monospace"}}>{v}</div>
+      <div style={{fontSize:12,fontWeight:600,color,marginTop:2}}>{label}</div>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// ECONOMIC CALENDAR WIDGET
+// ═══════════════════════════════════════════════════════════
+function EconCalWidget({extraEvents=[]}) {
+  const all=[...ECON_EVENTS,...extraEvents].sort((a,b)=>a.date.localeCompare(b.date));
+  const upcoming=all.filter(e=>e.date>=today()).slice(0,5);
+  const impactColor={high:G.red,med:G.yellow,low:G.green};
+  return (
+    <Card style={{padding:16}}>
+      <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",marginBottom:12}}>📅 Upcoming Events</div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {upcoming.map((e,i)=>(
+          <div key={i} style={{display:"flex",gap:10,alignItems:"center",padding:"6px 10px",background:G.panel2,borderRadius:8,border:`1px solid ${G.border}`}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:impactColor[e.impact]||G.muted,flexShrink:0}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:600,color:G.text}}>{e.event}</div>
+              <div style={{fontSize:10,color:G.muted}}>{e.date} · {e.time||""}</div>
+            </div>
+            <Badge label={e.impact} color={impactColor[e.impact]||G.muted} sm/>
+          </div>
+        ))}
+        {!upcoming.length&&<div style={{fontSize:12,color:G.muted,textAlign:"center",padding:8}}>No upcoming events</div>}
+      </div>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// PRE-TRADE CHECKLIST
+// ═══════════════════════════════════════════════════════════
+function PreTradeChecklist({checks,onChange}) {
+  const score=checks.filter(Boolean).length;
+  const color=score===3?G.green:score===2?G.yellow:G.red;
+  return (
+    <div style={{background:G.panel2,border:`1px solid ${color}44`,borderRadius:10,padding:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <span style={{fontSize:12,fontWeight:700,color:G.text}}>Pre-Trade Checklist</span>
+        <span style={{fontSize:12,fontWeight:700,color,fontFamily:"monospace"}}>{score}/3 {score===3?"✅":score===2?"⚠️":"❌"}</span>
+      </div>
+      {CHECKLIST.map((q,i)=>(
+        <div key={i} onClick={()=>{ const c=[...checks]; c[i]=!c[i]; onChange(c); }}
+          style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:10,cursor:"pointer",padding:"6px 8px",borderRadius:8,background:checks[i]?G.green+"12":"transparent",border:`1px solid ${checks[i]?G.green+"33":G.border}`,transition:"all .2s"}}>
+          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${checks[i]?G.green:G.dim}`,background:checks[i]?G.green:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>
+            {checks[i]&&<span style={{fontSize:10,color:"#000",fontWeight:700}}>✓</span>}
+          </div>
+          <span style={{fontSize:12,color:checks[i]?G.text:G.muted,lineHeight:1.4}}>{q}</span>
+        </div>
+      ))}
+      {score<3&&<div style={{fontSize:11,color:G.yellow,marginTop:4}}>⚠️ Consider reviewing your checklist before entering this trade.</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// RISK CALCULATOR
+// ═══════════════════════════════════════════════════════════
+function RiskCalc({initAccount=5000}) {
+  const [acc,  setAcc]  = useState(initAccount);
+  const [rPct, setRPct] = useState(2);
+  const [entry,setEntry]= useState("");
+  const [stop, setStop] = useState("");
+  const [side, setSide] = useState("Long");
+
+  const riskDollar = acc*(rPct/100);
+  const slPts  = entry&&stop ? Math.abs(parseFloat(entry)-parseFloat(stop)) : 0;
+  const shares = slPts>0 ? Math.floor(riskDollar/slPts) : 0;
+  const pos    = shares*parseFloat(entry||0);
+  const tgt1   = entry&&stop ? (side==="Long"?parseFloat(entry)+slPts*1.5:parseFloat(entry)-slPts*1.5).toFixed(2) : "—";
+  const tgt2   = entry&&stop ? (side==="Long"?parseFloat(entry)+slPts*2.5:parseFloat(entry)-slPts*2.5).toFixed(2) : "—";
+
+  const inp=(label,val,set,ph)=>(
+    <div>
+      <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>{label}</label>
+      <input type="number" value={val} onChange={e=>set(e.target.value)} placeholder={ph}
+        style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,fontFamily:"monospace",outline:"none",boxSizing:"border-box"}}/>
+    </div>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        {inp("Account Size ($)",acc,setAcc,"5000")}
+        <div>
+          <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>Risk % — {rPct}%</label>
+          <input type="range" min={0.5} max={5} step={0.5} value={rPct} onChange={e=>setRPct(+e.target.value)}
+            style={{width:"100%",marginTop:6,accentColor:G.accent}}/>
+        </div>
+        {inp("Entry Price",entry,setEntry,"150.00")}
+        {inp("Stop Price",stop,setStop,"145.00")}
+      </div>
+
+      <div style={{display:"flex",gap:8}}>
+        {["Long","Short"].map(s=>(
+          <button key={s} onClick={()=>setSide(s)}
+            style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${side===s?(s==="Long"?G.green:G.red):G.border}`,
+              background:side===s?(s==="Long"?G.green+"22":G.red+"22"):"transparent",
+              color:side===s?(s==="Long"?G.green:G.red):G.muted,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            {s==="Long"?"▲ Long":"▼ Short"}
+          </button>
+        ))}
+      </div>
+
+      {entry&&stop&&slPts>0?(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          {[
+            {label:"Risk $",value:money(riskDollar),color:G.yellow},
+            {label:"Stop Size",value:"$"+slPts.toFixed(2),color:G.muted},
+            {label:"Shares / Qty",value:shares,color:G.accent},
+            {label:"Position Size",value:"$"+pos.toFixed(0),color:G.text},
+            {label:"Target 1 (1.5R)",value:"$"+tgt1,color:G.green},
+            {label:"Target 2 (2.5R)",value:"$"+tgt2,color:G.green},
+          ].map(r=>(
+            <Card2 key={r.label} style={{padding:"10px 12px",textAlign:"center"}}>
+              <div style={{fontSize:10,color:G.muted,fontWeight:600,textTransform:"uppercase",marginBottom:4}}>{r.label}</div>
+              <div style={{fontSize:16,fontWeight:800,color:r.color,fontFamily:"monospace"}}>{r.value}</div>
+            </Card2>
+          ))}
+        </div>
+      ):(
+        <div style={{padding:20,textAlign:"center",color:G.muted,fontSize:13,background:G.panel2,borderRadius:10,border:`1px solid ${G.border}`}}>
+          Enter entry and stop price to calculate position size
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// AI TRADE REVIEW
+// ═══════════════════════════════════════════════════════════
+async function callClaude(prompt) {
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:1000,
+      messages:[{role:"user",content:prompt}]
+    })
+  });
+  const d=await r.json();
+  return d.content?.[0]?.text||"No response";
+}
+
+function AIReview({trade,onClose}) {
+  const [review,setReview]=useState("");
+  const [loading,setLoading]=useState(true);
+  const p=pnl(trade);
+
+  useEffect(()=>{
+    const prompt=`You are an expert stock trader and trading coach. Review this trade and give actionable feedback in 3 sections: 
+1. **Trade Quality** (rate 1-10 and explain)
+2. **What went well** (2-3 points)
+3. **What to improve** (2-3 points)
+
+Trade details:
+- Symbol: ${trade.symbol} | Date: ${trade.date}
+- Side: ${trade.side} | Strategy: ${trade.strategy}
+- Entry: $${trade.entry} | Exit: $${trade.exit} | Qty: ${trade.qty}
+- P&L: ${money(p)} | R-Multiple: ${trade.r||"N/A"}
+- Sector: ${trade.sector} | Session: ${trade.session}
+- Tags: ${trade.tags?.join(", ")||"none"}
+- Pre-trade checklist passed: ${trade.checklist?.filter(Boolean).length||0}/3
+- Notes: ${trade.notes||"none"}
+
+Be specific, encouraging, and practical. Keep it concise.`;
+    callClaude(prompt).then(setReview).finally(()=>setLoading(false));
+  },[]);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:14,padding:"12px 16px",background:G.panel2,borderRadius:10,border:`1px solid ${p>=0?G.green:G.red}44`}}>
+        <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>SYMBOL</div><div style={{fontSize:18,fontWeight:800,color:G.accent}}>{trade.symbol}</div></div>
+        <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>P&L</div><div style={{fontSize:18,fontWeight:800,color:p>=0?G.green:G.red,fontFamily:"monospace"}}>{money(p)}</div></div>
+        <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>STRATEGY</div><div style={{fontSize:14,fontWeight:600,color:G.text}}>{trade.strategy}</div></div>
+        <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>CHECKLIST</div><div style={{fontSize:14,fontWeight:600,color:trade.checklist?.filter(Boolean).length===3?G.green:G.yellow}}>{trade.checklist?.filter(Boolean).length||0}/3</div></div>
+      </div>
+      {loading?(
+        <div style={{textAlign:"center",padding:40,color:G.accent}}>
+          <div style={{fontSize:20,marginBottom:10}}>🤖</div>
+          <div style={{fontSize:14}}>Analyzing your trade…</div>
+        </div>
+      ):(
+        <div style={{background:G.panel2,border:`1px solid ${G.border}`,borderRadius:10,padding:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:G.accent,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>🤖 AI Trade Review</div>
+          <div style={{fontSize:13,color:G.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{review}</div>
+        </div>
+      )}
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <Btn onClick={onClose}>Close</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// WEEKLY REVIEW
+// ═══════════════════════════════════════════════════════════
+function WeeklyReview({trades}) {
+  const [review,setReview]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [selWeek,setSelWeek]=useState(wk(today()));
+
+  const weeks=[...new Set(trades.map(t=>wk(t.date)))].sort((a,b)=>b.localeCompare(a)).slice(0,8);
+  const weekTrades=trades.filter(t=>wk(t.date)===selWeek);
+  const weekPnl=weekTrades.reduce((a,t)=>a+pnl(t),0);
+  const wins=weekTrades.filter(t=>pnl(t)>0);
+
+  const generate=async()=>{
+    if(!weekTrades.length){alert("No trades this week.");return;}
+    setLoading(true);
+    const prompt=`You are a trading performance coach. Write a comprehensive weekly trading review for this trader based on their ${weekTrades.length} trades.
+
+Week of: ${selWeek}
+Net P&L: ${money(weekPnl)}
+Win Rate: ${wins.length}/${weekTrades.length} (${(wins.length/weekTrades.length*100).toFixed(0)}%)
+
+Trades:
+${weekTrades.map(t=>`- ${t.date} | ${t.side} ${t.symbol} | ${t.strategy} | Entry:$${t.entry} Exit:$${t.exit} | ${money(pnl(t))} | ${t.r||"?"}R | Tags:${t.tags?.join(",")||"none"} | Checklist:${t.checklist?.filter(Boolean).length||0}/3 | Notes:"${t.notes||"none"}"`).join("\n")}
+
+Write a structured weekly review with these sections:
+1. **Week Summary** (overall assessment)
+2. **Best Trade** (what worked and why)
+3. **Worst Trade** (what went wrong)
+4. **Pattern Analysis** (recurring themes, good or bad)
+5. **Focus for Next Week** (3 specific action items)
+
+Be specific to THIS trader's actual trades. Keep it practical and actionable.`;
+    const r=await callClaude(prompt);
+    setReview(r);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+        <div>
+          <label style={{fontSize:10,color:G.muted,fontWeight:700,display:"block",marginBottom:5}}>SELECT WEEK</label>
+          <select value={selWeek} onChange={e=>{ setSelWeek(e.target.value); setReview(""); }}
+            style={{background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"8px 12px",color:G.text,fontSize:13,outline:"none"}}>
+            {weeks.map(w=><option key={w} value={w}>Week of {w}</option>)}
+            {!weeks.includes(selWeek)&&<option value={selWeek}>Week of {selWeek}</option>}
+          </select>
+        </div>
+        <div style={{display:"flex",gap:14,alignItems:"flex-end",paddingBottom:2}}>
+          <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>TRADES</div><div style={{fontSize:18,fontWeight:800,color:G.text}}>{weekTrades.length}</div></div>
+          <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>NET P&L</div><div style={{fontSize:18,fontWeight:800,color:weekPnl>=0?G.green:G.red,fontFamily:"monospace"}}>{money(weekPnl)}</div></div>
+          <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>WIN RATE</div><div style={{fontSize:18,fontWeight:800,color:wins.length/Math.max(weekTrades.length,1)>=0.5?G.green:G.red}}>{weekTrades.length?Math.round(wins.length/weekTrades.length*100):0}%</div></div>
+        </div>
+        <div style={{marginLeft:"auto"}}>
+          <Btn onClick={generate} disabled={loading||!weekTrades.length}>
+            {loading?"🤖 Generating…":"🤖 Generate AI Review"}
+          </Btn>
+        </div>
+      </div>
+
+      {weekTrades.length>0&&(
+        <Card style={{overflow:"hidden"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr style={{borderBottom:`1px solid ${G.border}`}}>
+              {["Date","Symbol","Side","P&L","R","Strategy","Checklist"].map(h=>(
+                <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {weekTrades.map(t=>{
+                const p=pnl(t);
+                return (
+                  <tr key={t.id} style={{borderBottom:`1px solid ${G.border}`}}>
+                    <td style={{padding:"8px 12px",fontSize:11,fontFamily:"monospace",color:G.muted}}>{t.date}</td>
+                    <td style={{padding:"8px 12px",fontWeight:700,color:G.accent}}>{t.symbol}</td>
+                    <td style={{padding:"8px 12px"}}><Badge label={t.side} color={t.side==="Long"?G.green:G.red} sm/></td>
+                    <td style={{padding:"8px 12px",fontFamily:"monospace",fontWeight:700,color:p>=0?G.green:G.red,fontSize:12}}>{money(p)}</td>
+                    <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:12,color:G.purple}}>{t.r||"—"}</td>
+                    <td style={{padding:"8px 12px",fontSize:11,color:G.muted}}>{t.strategy}</td>
+                    <td style={{padding:"8px 12px",fontSize:12,color:t.checklist?.filter(Boolean).length===3?G.green:G.yellow}}>{t.checklist?.filter(Boolean).length||0}/3</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {review&&(
+        <Card style={{padding:20}}>
+          <div style={{fontSize:12,fontWeight:700,color:G.accent,marginBottom:12,display:"flex",alignItems:"center",gap:6}}>🤖 AI Weekly Review — Week of {selWeek}</div>
+          <div style={{fontSize:13,color:G.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{review}</div>
+        </Card>
+      )}
+
+      {!review&&!loading&&(
+        <div style={{textAlign:"center",padding:40,color:G.muted,background:G.panel2,borderRadius:12,border:`1px solid ${G.border}`}}>
+          <div style={{fontSize:32,marginBottom:10}}>📆</div>
+          <div style={{fontSize:14,marginBottom:6}}>Select a week and click Generate to get your AI review</div>
+          <div style={{fontSize:12}}>Claude will analyze all your trades and give you personalized feedback</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// PLAYBOOK
+// ═══════════════════════════════════════════════════════════
+function Playbook({playbook,onSave,onDelete,onUse}) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({name:"",strategy:"Inside Bar",side:"Long",sector:"Technology",notes:"",conditions:"",entry_rule:"",stop_rule:"",r_target:"2"});
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  const save=()=>{
+    if(!form.name)return;
+    onSave({...form,id:uid(),created:today()});
+    setForm({name:"",strategy:"Inside Bar",side:"Long",sector:"Technology",notes:"",conditions:"",entry_rule:"",stop_rule:"",r_target:"2"});
+    setShowAdd(false);
+  };
+
+  const inp=(label,key,ph="")=>(
+    <div>
+      <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>{label}</label>
+      <input value={form[key]} onChange={e=>set(key,e.target.value)} placeholder={ph}
+        style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"8px 12px",color:G.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
+    </div>
+  );
+  const area=(label,key,ph="")=>(
+    <div>
+      <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>{label}</label>
+      <textarea value={form[key]} onChange={e=>set(key,e.target.value)} placeholder={ph} rows={2}
+        style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"8px 12px",color:G.text,fontSize:13,fontFamily:"inherit",outline:"none",resize:"vertical",boxSizing:"border-box"}}/>
+    </div>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:14,fontWeight:700,color:G.text}}>📚 My Setups — {playbook.length} templates</div>
+        <Btn onClick={()=>setShowAdd(v=>!v)}>{showAdd?"Cancel":"+ New Setup"}</Btn>
+      </div>
+
+      {showAdd&&(
+        <Card style={{padding:18,border:`1px solid ${G.accent}44`}}>
+          <div style={{fontSize:13,fontWeight:700,color:G.accent,marginBottom:14}}>New Playbook Entry</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+            {inp("Setup Name","name","e.g. Clean IB at Support")}
+            <div>
+              <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>Strategy</label>
+              <select value={form.strategy} onChange={e=>set("strategy",e.target.value)}
+                style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"8px 12px",color:G.text,fontSize:13,outline:"none"}}>
+                {STRATEGIES.map(s=><option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>Side</label>
+              <div style={{display:"flex",gap:6}}>
+                {["Long","Short"].map(s=>(
+                  <button key={s} onClick={()=>set("side",s)}
+                    style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${form.side===s?(s==="Long"?G.green:G.red):G.border}`,background:form.side===s?(s==="Long"?G.green+"22":G.red+"22"):"transparent",color:form.side===s?(s==="Long"?G.green:G.red):G.muted,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            {area("Setup Conditions","conditions","What market conditions must be true?")}
+            {area("Entry Rule","entry_rule","How and where do you enter?")}
+            {area("Stop Rule","stop_rule","Where does your stop go?")}
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {inp("R Target","r_target","2.0")}
+              {area("Notes","notes","Additional notes about this setup")}
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:10}}>
+            <Btn ghost onClick={()=>setShowAdd(false)}>Cancel</Btn>
+            <Btn onClick={save}>Save Setup</Btn>
+          </div>
+        </Card>
+      )}
+
+      {playbook.length===0&&!showAdd&&(
+        <div style={{textAlign:"center",padding:50,color:G.muted,background:G.panel2,borderRadius:12,border:`1px solid ${G.border}`}}>
+          <div style={{fontSize:36,marginBottom:10}}>📚</div>
+          <div style={{fontSize:14,marginBottom:6}}>No setups saved yet</div>
+          <div style={{fontSize:12}}>Save your best setups to pre-fill the trade form quickly</div>
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        {playbook.map(p=>(
+          <Card key={p.id} style={{padding:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15,color:G.text,marginBottom:4}}>{p.name}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <Badge label={p.strategy} color={G.accent} sm/>
+                  <Badge label={p.side} color={p.side==="Long"?G.green:G.red} sm/>
+                  {p.r_target&&<Badge label={p.r_target+"R target"} color={G.yellow} sm/>}
+                </div>
+              </div>
+              <button onClick={()=>onDelete(p.id)} style={{background:"none",border:"none",color:G.red,cursor:"pointer",fontSize:16,padding:2}}>🗑️</button>
+            </div>
+            {p.conditions&&<div style={{fontSize:12,color:G.muted,marginBottom:6}}><strong style={{color:G.text}}>Conditions:</strong> {p.conditions}</div>}
+            {p.entry_rule&&<div style={{fontSize:12,color:G.muted,marginBottom:6}}><strong style={{color:G.text}}>Entry:</strong> {p.entry_rule}</div>}
+            {p.stop_rule&&<div style={{fontSize:12,color:G.muted,marginBottom:10}}><strong style={{color:G.text}}>Stop:</strong> {p.stop_rule}</div>}
+            <Btn sm ghost onClick={()=>onUse(p)} style={{width:"100%",marginTop:6}}>Use This Setup →</Btn>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// WATCHLIST
+// ═══════════════════════════════════════════════════════════
+function WatchlistTab({watchlist,onUpdate,apiKey,onAddToJournal,onOpenChart}) {
+  const [input,setInput]=useState("");
+  const [note,setNote]=useState({});
+  const [del,setDel]=useState(null);
+  const [finvizFilter,setFinvizFilter]=useState({minPrice:"5",maxPrice:"50",minVol:"1000000",rsi:"under40"});
+  const syms=watchlist.map(w=>w.symbol);
+  const prices=usePrices(syms,apiKey);
+
+  const add=()=>{
+    const syms2=input.toUpperCase().split(/[\s,]+/).filter(Boolean);
+    const toAdd=syms2.filter(s=>!watchlist.find(w=>w.symbol===s)).map(s=>({symbol:s,added:today(),note:""}));
+    if(toAdd.length) onUpdate([...watchlist,...toAdd]);
+    setInput("");
+  };
+
+  const remove=id=>onUpdate(watchlist.filter(w=>w.symbol!==id));
+  const updateNote=(sym,n)=>onUpdate(watchlist.map(w=>w.symbol===sym?{...w,note:n}:w));
+
+  const fvUrl=()=>{
+    const {minPrice,maxPrice,minVol,rsi}=finvizFilter;
+    const rsiCode=rsi==="under40"?"rsi_ob40":"rsi_ob60";
+    return `https://finviz.com/screener.ashx?v=111&f=cap_smallover,exch_nasdaq|exch_nyse,price_${minPrice}to${maxPrice},sh_avgvol_o${Math.round(+minVol/1000)}k,${rsiCode},ta_averagetruerange_o0.5`;
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {del&&<Confirm text={`Remove ${del} from watchlist?`} onOk={()=>{remove(del);setDel(null);}} onCancel={()=>setDel(null)}/>}
+
+      {/* Add */}
+      <Card style={{padding:16}}>
+        <div style={{fontSize:12,fontWeight:700,color:G.text,marginBottom:10}}>Add Stocks to Watch</div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={input} onChange={e=>setInput(e.target.value.toUpperCase())}
+            onKeyDown={e=>e.key==="Enter"&&add()} placeholder="AAPL, TSLA, AMD…"
+            style={{flex:1,background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,fontFamily:"monospace",outline:"none"}}/>
+          <Btn onClick={add} disabled={!input.trim()}>+ Add</Btn>
+        </div>
+        {!apiKey&&<div style={{fontSize:11,color:G.yellow,marginTop:8}}>⚠️ Set Finnhub API key in Settings to see live prices.</div>}
+      </Card>
+
+      {/* Finviz Scanner Builder */}
+      <Card style={{padding:16}}>
+        <div style={{fontSize:12,fontWeight:700,color:G.accent,marginBottom:12}}>🔍 Finviz Scanner Builder</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:12}}>
+          {[
+            {label:"Min Price",key:"minPrice"},
+            {label:"Max Price",key:"maxPrice"},
+            {label:"Min Volume",key:"minVol"},
+          ].map(f=>(
+            <div key={f.key}>
+              <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:4}}>{f.label}</label>
+              <input value={finvizFilter[f.key]} onChange={e=>setFinvizFilter(v=>({...v,[f.key]:e.target.value}))}
+                style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"7px 10px",color:G.text,fontSize:12,fontFamily:"monospace",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+          ))}
+          <div>
+            <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:4}}>RSI Filter</label>
+            <select value={finvizFilter.rsi} onChange={e=>setFinvizFilter(v=>({...v,rsi:e.target.value}))}
+              style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"7px 10px",color:G.text,fontSize:12,outline:"none"}}>
+              <option value="under40">RSI under 40</option>
+              <option value="under60">RSI under 60</option>
+              <option value="over60">RSI over 60</option>
+            </select>
+          </div>
+        </div>
+        <a href={fvUrl()} target="_blank" rel="noreferrer"
+          style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 16px",borderRadius:8,background:G.accent+"22",border:`1px solid ${G.accent}44`,color:G.accent,textDecoration:"none",fontSize:12,fontWeight:700}}>
+          ↗ Open Finviz Screener with These Filters
+        </a>
+        <div style={{fontSize:11,color:G.muted,marginTop:8}}>Copy tickers from Finviz results and paste them above to add to your watchlist.</div>
+      </Card>
+
+      {/* Watchlist table */}
+      {watchlist.length===0?(
+        <div style={{textAlign:"center",padding:50,color:G.muted,background:G.panel2,borderRadius:12,border:`1px solid ${G.border}`}}>
+          <div style={{fontSize:32,marginBottom:10}}>👁️</div>
+          <div style={{fontSize:14}}>Your watchlist is empty — add some tickers above</div>
+        </div>
+      ):(
+        <Card style={{overflow:"hidden"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr style={{borderBottom:`1px solid ${G.border}`}}>
+              {["Symbol","Price","Change","High","Low","Note","Actions"].map(h=>(
+                <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {watchlist.map(w=>{
+                const q=prices[w.symbol];
+                return (
+                  <tr key={w.symbol} style={{borderBottom:`1px solid ${G.border}`}}>
+                    <td style={{padding:"10px 14px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontWeight:800,color:G.accent,fontSize:14}}>{w.symbol}</span>
+                        <button onClick={()=>onOpenChart(w.symbol)} style={{background:G.accent+"18",border:`1px solid ${G.accent}33`,borderRadius:5,padding:"1px 7px",color:G.accent,cursor:"pointer",fontSize:10,fontWeight:700,fontFamily:"inherit"}}>TV</button>
+                      </div>
+                      <div style={{fontSize:10,color:G.muted}}>Added {w.added}</div>
+                    </td>
+                    <td style={{padding:"10px 14px",fontFamily:"monospace",fontWeight:700,fontSize:14,color:G.text}}>{q?`$${q.price.toFixed(2)}`:"—"}</td>
+                    <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:13,color:q?(q.changePct>=0?G.green:G.red):G.muted}}>
+                      {q?(q.changePct>=0?"+":"")+q.changePct.toFixed(2)+"%":"—"}
+                    </td>
+                    <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:12,color:G.muted}}>{q?`$${q.high.toFixed(2)}`:"—"}</td>
+                    <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:12,color:G.muted}}>{q?`$${q.low.toFixed(2)}`:"—"}</td>
+                    <td style={{padding:"10px 14px"}}>
+                      <input value={w.note||""} onChange={e=>updateNote(w.symbol,e.target.value)} placeholder="Notes…"
+                        style={{background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:6,padding:"5px 9px",color:G.text,fontSize:11,fontFamily:"inherit",outline:"none",width:140}}/>
+                    </td>
+                    <td style={{padding:"10px 14px",whiteSpace:"nowrap"}}>
+                      <button onClick={()=>onAddToJournal(w.symbol)} style={{background:G.green+"22",border:`1px solid ${G.green}44`,borderRadius:6,padding:"5px 10px",color:G.green,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit",marginRight:6}}>+ Trade</button>
+                      <button onClick={()=>setDel(w.symbol)} style={{background:G.red+"18",border:`1px solid ${G.red}44`,borderRadius:6,padding:"5px 10px",color:G.red,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>🗑️</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRADE FORM (with screenshot, checklist, playbook prefill)
+// ═══════════════════════════════════════════════════════════
+function TradeForm({init,onSave,onClose,playbook=[]}) {
+  const blank={date:today(),symbol:"",side:"Long",entry:"",exit:"",qty:"",fees:"1.5",strategy:"Inside Bar",session:"Regular",sector:"Technology",tags:[],r:"",notes:"",reason:"",stopLoss:"",takeProfit:"",accountSize:"5000",checklist:[false,false,false],screenshot:null};
+  const [f,setF]=useState(init?{...blank,...init,qty:init.qty??init.shares??"",r:init.r??init.rMultiple??"",checklist:init.checklist||[false,false,false]}:blank);
+  const [showRisk,setShowRisk]=useState(false);
+  const [showPlaybook,setShowPlaybook]=useState(false);
+  const [uploading,setUploading]=useState(false);
+  const fileRef=useRef();
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const toggleTag=t=>set("tags",f.tags.includes(t)?f.tags.filter(x=>x!==t):[...f.tags,t]);
+
+  const estPnl=f.entry&&f.exit&&f.qty?parseFloat(((f.side==="Long"?f.exit-f.entry:f.entry-f.exit)*f.qty-(f.fees||0)).toFixed(2)):null;
+
+  const handleFile=async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    setUploading(true);
+    const reader=new FileReader();
+    reader.onload=async ev=>{ const comp=await compressImage(ev.target.result); set("screenshot",comp); setUploading(false); };
+    reader.readAsDataURL(file);
+  };
+
+  const useTemplate=p=>{ setF(f=>({...f,strategy:p.strategy,side:p.side,sector:p.sector||f.sector,notes:p.conditions?`Setup: ${p.name}\nConditions: ${p.conditions}\n${f.notes}`:`Setup: ${p.name}\n${f.notes}`,r:p.r_target||f.r})); setShowPlaybook(false); };
+
+  const doSave=()=>{
+    if(!f.symbol||!f.date||!f.entry||!f.exit||!f.qty){alert("Please fill Date, Symbol, Entry, Exit and Qty.");return;}
+    onSave({...f,id:f.id||uid(),entry:+f.entry,exit:+f.exit,qty:+f.qty,fees:+(f.fees||0),r:+f.r||undefined,accountSize:+(f.accountSize||5000)});
+  };
+
+  const inp=(label,key,type="text",req=false)=>(
+    <div>
+      <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>{label}{req&&<span style={{color:G.red}}>*</span>}</label>
+      <input type={type} value={f[key]} onChange={e=>set(key,e.target.value)}
+        style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,fontFamily:"monospace",outline:"none",boxSizing:"border-box"}}/>
+    </div>
+  );
+  const pick=(label,key,opts)=>(
+    <div>
+      <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>{label}</label>
+      <select value={f[key]} onChange={e=>set(key,e.target.value)}
+        style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,outline:"none"}}>
+        {opts.map(o=><option key={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+
+  const ep=+f.entry, sl=+f.stopLoss, tp=+f.takeProfit;
+  const showRRBar = f.entry && f.stopLoss && f.takeProfit && sl>0 && tp>0;
+  const rrRisk   = showRRBar ? Math.abs(ep-sl) : 0;
+  const rrReward = showRRBar ? Math.abs(tp-ep) : 0;
+  const rrRatio  = rrRisk>0 ? (rrReward/rrRisk).toFixed(2) : 0;
+  const slPct    = showRRBar ? Math.abs((sl-ep)/ep*100).toFixed(2) : 0;
+  const tpPct    = showRRBar ? Math.abs((tp-ep)/ep*100).toFixed(2) : 0;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Playbook quick-use */}
+      {playbook.length>0&&(
+        <div>
+          <button onClick={()=>setShowPlaybook(v=>!v)}
+            style={{background:G.purple+"18",border:`1px solid ${G.purple}44`,borderRadius:8,padding:"7px 14px",color:G.purple,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>
+            📚 {showPlaybook?"Hide Playbook":"Use a Playbook Setup"}
+          </button>
+          {showPlaybook&&(
+            <div style={{marginTop:10,display:"flex",flexWrap:"wrap",gap:8}}>
+              {playbook.map(p=>(
+                <button key={p.id} onClick={()=>useTemplate(p)}
+                  style={{background:G.panel2,border:`1px solid ${G.border}`,borderRadius:8,padding:"6px 14px",color:G.text,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
+                  {p.name} <span style={{color:G.muted}}>({p.strategy})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* P&L preview */}
+      {estPnl!==null&&(
+        <div style={{background:estPnl>=0?G.green+"18":G.red+"18",border:`1px solid ${estPnl>=0?G.green:G.red}44`,borderRadius:10,padding:"12px 16px",display:"flex",gap:20,flexWrap:"wrap"}}>
+          <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>EST. P&L</div><div style={{fontSize:22,fontWeight:800,color:estPnl>=0?G.green:G.red,fontFamily:"monospace"}}>{money(estPnl)}</div></div>
+          <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>ACCT RISK</div><div style={{fontSize:18,fontWeight:700,color:G.yellow,fontFamily:"monospace"}}>{(Math.abs(estPnl)/+(f.accountSize||5000)*100).toFixed(2)}%</div></div>
+          {f.r&&<div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>R-MULTIPLE</div><div style={{fontSize:18,fontWeight:700,color:G.purple,fontFamily:"monospace"}}>{+f.r}R</div></div>}
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+        {inp("Date","date","date",true)}
+        {inp("Symbol","symbol","text",true)}
+        <div>
+          <label style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",display:"block",marginBottom:5}}>Side</label>
+          <div style={{display:"flex",gap:8}}>
+            {["Long","Short"].map(s=>(
+              <button key={s} onClick={()=>set("side",s)}
+                style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${f.side===s?(s==="Long"?G.green:G.red):G.border}`,background:f.side===s?(s==="Long"?G.green+"22":G.red+"22"):"transparent",color:f.side===s?(s==="Long"?G.green:G.red):G.muted,fontWeight:700,cursor:"pointer",fontFamily:"inherit",fontSize:13}}>
+                {s==="Long"?"▲ Long":"▼ Short"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {inp("Entry Price","entry","number",true)}
+        {inp("Exit Price","exit","number",true)}
+        {inp("Qty / Shares","qty","number",true)}
+        {inp("Stop Loss ($)","stopLoss","number")}
+        {inp("Take Profit ($)","takeProfit","number")}
+        {inp("Fees ($)","fees","number")}
+        {inp("R-Multiple","r","number")}
+        {inp("Account Size","accountSize","number")}
+      </div>
+
+      {/* SL/TP visual bar */}
+      {showRRBar && (
+          <div style={{background:G.panel2,border:`1px solid ${G.border}`,borderRadius:10,padding:"12px 16px"}}>
+            <div style={{fontSize:11,fontWeight:700,color:G.text,marginBottom:10}}>📐 Risk / Reward Overview</div>
+            <div style={{display:"flex",gap:20,flexWrap:"wrap",marginBottom:10}}>
+              <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>STOP LOSS</div><div style={{fontSize:15,fontWeight:800,color:G.red,fontFamily:"monospace"}}>${sl} <span style={{fontSize:11,color:G.red}}>(-{slPct}%)</span></div></div>
+              <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>TAKE PROFIT</div><div style={{fontSize:15,fontWeight:800,color:G.green,fontFamily:"monospace"}}>${tp} <span style={{fontSize:11,color:G.green}}>(+{tpPct}%)</span></div></div>
+              <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>R:R RATIO</div><div style={{fontSize:15,fontWeight:800,color:+rrRatio>=2?G.green:+rrRatio>=1?G.yellow:G.red,fontFamily:"monospace"}}>{rrRatio}:1</div></div>
+              <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>RISK $</div><div style={{fontSize:15,fontWeight:800,color:G.yellow,fontFamily:"monospace"}}>${(rrRisk*+(f.qty||0)).toFixed(2)}</div></div>
+            </div>
+            <div style={{position:"relative",height:8,background:G.border,borderRadius:4,overflow:"hidden"}}>
+              <div style={{position:"absolute",left:0,top:0,height:"100%",width:(rrReward/(rrRisk+rrReward)*100)+"%",background:G.green,borderRadius:4}}/>
+              <div style={{position:"absolute",right:0,top:0,height:"100%",width:(rrRisk/(rrRisk+rrReward)*100)+"%",background:G.red,borderRadius:"0 4px 4px 0"}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontSize:10,color:G.muted}}>
+              <span style={{color:G.red}}>◀ Risk ${rrRisk.toFixed(2)}</span>
+              <span style={{color:G.green}}>Reward ${rrReward.toFixed(2)} ▶</span>
+            </div>
+          </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+        {pick("Strategy","strategy",STRATEGIES)}
+        {pick("Session","session",SESSIONS)}
+        {pick("Sector","sector",SECTORS)}
+      </div>
+
+      {/* Risk calc toggle */}
+      <button onClick={()=>setShowRisk(v=>!v)}
+        style={{background:G.cyan+"12",border:`1px solid ${G.cyan}33`,borderRadius:8,padding:"7px 14px",color:G.cyan,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit",textAlign:"left"}}>
+        🧮 {showRisk?"Hide":"Show"} Position Size Calculator
+      </button>
+      {showRisk&&(
+        <Card2 style={{padding:16}}>
+          <RiskCalc initAccount={+(f.accountSize||5000)}/>
+        </Card2>
+      )}
+
+      {/* Tags */}
+      <div>
+        <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>Tags</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {ALL_TAGS.map(t=>(
+            <button key={t} onClick={()=>toggleTag(t)}
+              style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${f.tags.includes(t)?G.accent:G.border}`,background:f.tags.includes(t)?G.accent+"22":"transparent",color:f.tags.includes(t)?G.accent:G.muted,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Checklist */}
+      <PreTradeChecklist checks={f.checklist} onChange={v=>set("checklist",v)}/>
+
+      {/* Reason for trade */}
+      <div>
+        <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:6}}>💡 Reason for Taking This Trade</div>
+        <textarea value={f.reason||""} onChange={e=>set("reason",e.target.value)} rows={2} placeholder="Why are you taking this trade? What is the catalyst or thesis?"
+          style={{width:"100%",background:"var(--input)",border:`1px solid ${G.accent}44`,borderRadius:8,padding:"10px 12px",color:G.text,fontSize:13,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box",outline:"none"}}/>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:6}}>Notes / Post-Trade Review</div>
+        <textarea value={f.notes} onChange={e=>set("notes",e.target.value)} rows={3}
+          style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"10px 12px",color:G.text,fontSize:13,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box",outline:"none"}}/>
+      </div>
+
+      {/* Screenshot */}
+      <div>
+        <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",marginBottom:8}}>Chart Screenshot</div>
+        <input type="file" ref={fileRef} accept="image/*" onChange={handleFile} style={{display:"none"}}/>
+        {f.screenshot?(
+          <div style={{position:"relative",display:"inline-block"}}>
+            <img src={f.screenshot} alt="screenshot" style={{maxWidth:"100%",maxHeight:200,borderRadius:8,border:`1px solid ${G.border}`}}/>
+            <button onClick={()=>set("screenshot",null)} style={{position:"absolute",top:6,right:6,background:G.red,border:"none",borderRadius:6,padding:"3px 8px",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700}}>×</button>
+          </div>
+        ):(
+          <button onClick={()=>fileRef.current.click()}
+            style={{padding:"10px 18px",background:G.panel2,border:`2px dashed ${G.border}`,borderRadius:8,color:G.muted,cursor:"pointer",fontSize:13,fontFamily:"inherit",width:"100%"}}>
+            {uploading?"Compressing…":"📸 Upload Chart Screenshot (JPEG/PNG)"}
+          </button>
+        )}
+      </div>
+
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <Btn ghost onClick={onClose}>Cancel</Btn>
+        <Btn onClick={doSave}>{init?"Save Changes":"Log Trade +"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// CSV IMPORT & PINE SCRIPT
+// ═══════════════════════════════════════════════════════════
+function CSVImport({onImport,onClose}) {
+  const [text,setText]=useState("");
+  const [preview,setPreview]=useState(null);
+  const [err,setErr]=useState("");
+  const fileRef=useRef();
+
+  const parse=()=>{
+    setErr("");
+    const lines=text.trim().split(/\r?\n/).filter(Boolean);
+    if(lines.length<2){setErr("Need at least a header row and one data row.");return;}
+    const headers=lines[0].split(",").map(h=>h.trim().replace(/"/g,"").toLowerCase());
+    const get=(row,...keys)=>{ for(const k of keys){ const i=headers.findIndex(h=>h.includes(k)); if(i>=0) return row[i]?.replace(/"/g,"").trim()||""; } return ""; };
+    const rows=lines.slice(1).map(l=>l.split(",").map(c=>c.trim().replace(/"/g,"")));
+    const trades=rows.map(row=>{
+      const dateRaw=get(row,"date","time"); if(!dateRaw) return null;
+      const dateStr=dateRaw.split(" ")[0].replace(/\//g,"-");
+      const entry=parseFloat(get(row,"entry","open","buy","price"))||0;
+      const exit=parseFloat(get(row,"exit","close","sell"))||0;
+      const qty=parseFloat(get(row,"qty","contracts","shares","size","quantity"))||1;
+      const sym=get(row,"symbol","ticker","instrument")||"UNKNOWN";
+      const sideR=get(row,"side","type","direction").toLowerCase();
+      const side=sideR.includes("short")?"Short":"Long";
+      if(!entry&&!exit) return null;
+      return {id:uid(),date:dateStr,symbol:sym,side,entry,exit:exit||entry,qty,fees:0,strategy:"Breakout",session:"Regular",sector:"Technology",tags:[],r:undefined,notes:"Imported from TradingView",checklist:[false,false,false],screenshot:null};
+    }).filter(Boolean);
+    if(!trades.length){setErr("No valid rows found.");return;}
+    setPreview(trades);
+  };
+
+  if(preview) return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{padding:"10px 16px",background:G.green+"18",border:`1px solid ${G.green}44`,borderRadius:8,color:G.green,fontSize:13,fontWeight:700}}>✓ Found {preview.length} trades</div>
+      <div style={{maxHeight:300,overflowY:"auto",border:`1px solid ${G.border}`,borderRadius:10}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr style={{borderBottom:`1px solid ${G.border}`,background:G.panel}}>
+            {["Date","Symbol","Side","Entry","Exit","Qty"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>{preview.map((t,i)=>(
+            <tr key={i} style={{borderBottom:`1px solid ${G.border}`}}>
+              <td style={{padding:"8px 12px",fontSize:11,fontFamily:"monospace",color:G.muted}}>{t.date}</td>
+              <td style={{padding:"8px 12px",fontWeight:700,color:G.accent}}>{t.symbol}</td>
+              <td style={{padding:"8px 12px"}}><Badge label={t.side} color={t.side==="Long"?G.green:G.red} sm/></td>
+              <td style={{padding:"8px 12px",fontFamily:"monospace"}}>${t.entry}</td>
+              <td style={{padding:"8px 12px",fontFamily:"monospace"}}>${t.exit}</td>
+              <td style={{padding:"8px 12px",fontFamily:"monospace"}}>{t.qty}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <Btn ghost onClick={()=>setPreview(null)}>← Back</Btn>
+        <Btn color={G.green} onClick={()=>{onImport(preview);onClose();}}>Import {preview.length} Trades</Btn>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <input type="file" ref={fileRef} accept=".csv" onChange={e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>setText(ev.target.result);r.readAsText(f);}}} style={{display:"none"}}/>
+      <button onClick={()=>fileRef.current.click()} style={{padding:"9px 18px",background:G.panel2,border:`1px solid ${G.border}`,borderRadius:8,color:G.text,cursor:"pointer",fontFamily:"inherit",fontSize:13}}>📂 Upload CSV File</button>
+      <textarea value={text} onChange={e=>setText(e.target.value)} rows={8}
+        placeholder={"Paste TradingView CSV here…\n\nDate,Symbol,Side,Entry,Exit,Qty\n2026-05-01,AAPL,Long,171.2,175.8,50"}
+        style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:10,padding:"12px 16px",color:"#7dd3fc",fontSize:12,fontFamily:"monospace",resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+      {err&&<div style={{padding:"10px 14px",background:G.red+"18",border:`1px solid ${G.red}44`,borderRadius:8,color:G.red,fontSize:13}}>⚠️ {err}</div>}
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <Btn ghost onClick={onClose}>Cancel</Btn>
+        <Btn disabled={!text.trim()} onClick={parse}>Parse →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function PineExport({trades,onClose}) {
+  const [copied,setCopied]=useState(false);
+  const [sym,setSym]=useState("ALL");
+  const syms=["ALL",...new Set(trades.map(t=>t.symbol))];
+  const list=sym==="ALL"?trades:trades.filter(t=>t.symbol===sym);
+
+  const script=useMemo(()=>{
+    const lines=list.map(t=>{
+      const p=pnl(t);
+      const [y,m,d]=t.date.split("-").map(Number);
+      const tag=`${t.side==="Long"?"▲":"▼"} ${t.symbol}\\n$${t.entry}→$${t.exit}\\n${p>=0?"+":""}$${Math.abs(p).toFixed(2)}`;
+      const clr=p>=0?"color.lime":"color.red";
+      const loc=t.side==="Long"?"low*0.997":"high*1.003";
+      const sty=t.side==="Long"?"label.style_label_up":"label.style_label_down";
+      return `    if year==${y} and month==${m} and dayofmonth==${d} and timeframe.isdaily\n        label.new(bar_index,${loc},"${tag}",color=${clr},textcolor=color.white,style=${sty},size=size.small)`;
+    }).join("\n");
+    const total=list.reduce((a,t)=>a+pnl(t),0);
+    const wr=list.length?(list.filter(t=>pnl(t)>0).length/list.length*100).toFixed(0):0;
+    return `//@version=5\nindicator("TradeLog Pro",overlay=true,max_labels_count=500)\n\n${lines}\n\nif barstate.islast\n    var t=table.new(position.top_right,2,3,bgcolor=color.new(color.black,30),border_color=color.gray,border_width=1)\n    table.cell(t,0,0,"TradeLog Pro",text_color=color.aqua,text_size=size.small)\n    table.cell(t,1,0,"${list.length} trades",text_color=color.white,text_size=size.small)\n    table.cell(t,0,1,"Net P&L",text_color=color.gray,text_size=size.tiny)\n    table.cell(t,1,1,"${total>=0?"+":""}$${Math.abs(total).toFixed(2)}",text_color=${total>=0?"color.lime":"color.red"},text_size=size.small)\n    table.cell(t,0,2,"Win Rate",text_color=color.gray,text_size=size.tiny)\n    table.cell(t,1,2,"${wr}%",text_color=${+wr>=50?"color.lime":"color.red"},text_size=size.small)\n`;
+  },[list]);
+
+  const copy=()=>{ navigator.clipboard.writeText(script); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:11,color:G.muted,fontWeight:700}}>SYMBOL:</span>
+        {syms.map(s=><button key={s} onClick={()=>setSym(s)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${sym===s?G.accent:G.border}`,background:sym===s?G.accent+"22":"transparent",color:sym===s?G.accent:G.muted,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>{s}</button>)}
+        <a href="https://www.tradingview.com/chart/" target="_blank" rel="noreferrer" style={{marginLeft:"auto",padding:"7px 14px",borderRadius:8,background:G.panel2,color:G.text,textDecoration:"none",fontSize:12,fontWeight:700,border:`1px solid ${G.border}`}}>↗ TradingView</a>
+        <Btn onClick={copy} color={copied?G.green:G.accent}>{copied?"✓ Copied!":"📋 Copy Script"}</Btn>
+      </div>
+      <pre style={{background:"#070b14",border:`1px solid ${G.border}`,borderRadius:10,padding:"14px 18px",fontSize:11,color:"#7dd3fc",fontFamily:"monospace",overflowX:"auto",overflowY:"auto",maxHeight:380,margin:0,lineHeight:1.7}}>{script}</pre>
+      <div style={{fontSize:12,color:G.muted,padding:"8px 12px",background:G.panel2,borderRadius:8,border:`1px solid ${G.border}`}}>
+        💡 Works on <strong style={{color:G.yellow}}>Daily timeframe</strong>. Paste into Pine Editor → Add to Chart.
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// TV CHART
+// ═══════════════════════════════════════════════════════════
+function TVChart({symbol,onClose}) {
+  const [tf,setTf]=useState("D");
+  const [ex,setEx]=useState("NASDAQ");
+  return (
+    <Modal title={`📊 ${symbol} — TradingView`} onClose={onClose} wide>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        <div style={{display:"flex",gap:5}}>{["NASDAQ","NYSE","AMEX"].map(e=><button key={e} onClick={()=>setEx(e)} style={{padding:"5px 12px",borderRadius:7,border:`1px solid ${ex===e?G.accent:G.border}`,background:ex===e?G.accent+"22":"transparent",color:ex===e?G.accent:G.muted,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>{e}</button>)}</div>
+        <div style={{display:"flex",gap:5}}>{[["1","1m"],["5","5m"],["15","15m"],["60","1h"],["D","Day"],["W","Week"]].map(([v,l])=><button key={v} onClick={()=>setTf(v)} style={{padding:"5px 12px",borderRadius:7,border:`1px solid ${tf===v?G.accent:G.border}`,background:tf===v?G.accent+"22":"transparent",color:tf===v?G.accent:G.muted,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>{l}</button>)}</div>
+        <a href={`https://www.tradingview.com/chart/?symbol=${ex}:${symbol}`} target="_blank" rel="noreferrer" style={{marginLeft:"auto",padding:"7px 14px",borderRadius:8,background:G.panel2,color:G.accent,textDecoration:"none",fontSize:12,fontWeight:700,border:`1px solid ${G.border}`}}>↗ Full TV</a>
+      </div>
+      <div style={{borderRadius:12,overflow:"hidden",border:`1px solid ${G.border}`}}>
+        <iframe key={`${ex}:${symbol}-${tf}`} src={`https://www.tradingview.com/widgetembed/?symbol=${ex}:${symbol}&interval=${tf}&theme=dark&style=1&locale=en&toolbar_bg=0f1623&hide_side_toolbar=0&allow_symbol_change=1`} width="100%" height="500" frameBorder="0" allowTransparency scrolling="no" style={{display:"block"}} title="TV"/>
+      </div>
+    </Modal>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════
+function calcStats(trades) {
+  if(!trades.length) return null;
+  const wp=trades.map(t=>({...t,P:pnl(t)}));
+  const wins=wp.filter(t=>t.P>0),losses=wp.filter(t=>t.P<0);
+  const net=wp.reduce((a,t)=>a+t.P,0);
+  const wr=wins.length/trades.length*100;
+  const avgW=wins.length?wins.reduce((a,t)=>a+t.P,0)/wins.length:0;
+  const avgL=losses.length?losses.reduce((a,t)=>a+t.P,0)/losses.length:0;
+  const gW=wins.reduce((a,t)=>a+t.P,0),gL=Math.abs(losses.reduce((a,t)=>a+t.P,0));
+  const pf=gL?gW/gL:gW?Infinity:0;
+  const sorted=[...wp].sort((a,b)=>a.date.localeCompare(b.date));
+  let eq=0; const equity=sorted.map(t=>{eq+=t.P;return{date:t.date,v:+eq.toFixed(2)};});
+  const byDay={};
+  wp.forEach(t=>{byDay[t.date]=(byDay[t.date]||0)+t.P;});
+  const daily=Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,v])=>({date,v:+v.toFixed(2)}));
+  const bySt={};
+  wp.forEach(t=>{if(!bySt[t.strategy])bySt[t.strategy]={name:t.strategy,P:0,n:0,w:0};bySt[t.strategy].P+=t.P;bySt[t.strategy].n++;if(t.P>0)bySt[t.strategy].w++;});
+  const byStrat=Object.values(bySt).map(s=>({...s,P:+s.P.toFixed(2),wr:(s.w/s.n*100).toFixed(0)}));
+  const bySec={};
+  wp.forEach(t=>{if(!bySec[t.sector])bySec[t.sector]={name:t.sector,P:0,n:0};bySec[t.sector].P+=t.P;bySec[t.sector].n++;});
+  let peak=0,dd=0;equity.forEach(p=>{if(p.v>peak)peak=p.v;const d=peak-p.v;if(d>dd)dd=d;});
+  const rVals=wp.filter(t=>t.r).map(t=>t.r);
+  const avgR=rVals.length?rVals.reduce((a,v)=>a+v,0)/rVals.length:0;
+  const clPassed=wp.filter(t=>t.checklist?.filter(Boolean).length===3);
+  const clFailed=wp.filter(t=>t.checklist?.filter(Boolean).length<3);
+  const clPassWr=clPassed.length?(clPassed.filter(t=>t.P>0).length/clPassed.length*100).toFixed(0):0;
+  const clFailWr=clFailed.length?(clFailed.filter(t=>t.P>0).length/clFailed.length*100).toFixed(0):0;
+  return{wp,wins,losses,net,wr,avgW,avgL,gW,gL,pf,equity,daily,byStrat,bySec:Object.values(bySec),dd,avgR,clPassWr,clFailWr,sorted};
+}
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function Dashboard({trades,fg,extraEvents}) {
+  const s=useMemo(()=>calcStats(trades),[trades]);
+  const COLS=[G.accent,G.purple,G.green,G.yellow,G.red,G.orange,G.cyan,"#ec4899","#14b8a6"];
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+        <KPI label="Net P&L" value={s?money(s.net):"$0.00"} color={s?(s.net>=0?G.green:G.red):G.muted}/>
+        <KPI label="Win Rate" value={s?s.wr.toFixed(1)+"%":"—"} color={s?(s.wr>=50?G.green:G.red):G.muted}/>
+        <KPI label="Profit Factor" value={s?(isFinite(s.pf)?s.pf.toFixed(2):"∞"):"—"} color={s?(s.pf>=1.5?G.green:s.pf>=1?G.yellow:G.red):G.muted}/>
+        <KPI label="Avg R" value={s?s.avgR.toFixed(2)+"R":"—"} color={s?(s.avgR>=1?G.green:G.red):G.muted}/>
+        <KPI label="Total Trades" value={trades.length} color={G.text}/>
+        <KPI label="Avg Win" value={s?money(s.avgW):"—"} color={G.green}/>
+        <KPI label="Avg Loss" value={s?money(s.avgL):"—"} color={G.red}/>
+        <KPI label="Max Drawdown" value={s?money(-s.dd):"—"} color={G.red}/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+        <FearGreedWidget fg={fg}/>
+        <EconCalWidget extraEvents={extraEvents}/>
+        <Card style={{padding:16}}>
+          <div style={{fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".1em",marginBottom:12}}>✅ Checklist Impact</div>
+          {s?(<>
+            <div style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:G.text}}>3/3 checklist</span><span style={{fontSize:13,fontWeight:700,color:G.green}}>{s.clPassWr}% WR</span></div>
+              <div style={{height:8,background:G.border,borderRadius:4}}><div style={{height:"100%",width:s.clPassWr+"%",background:G.green,borderRadius:4}}/></div>
+            </div>
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:G.text}}>{"<"}3/3 checklist</span><span style={{fontSize:13,fontWeight:700,color:G.red}}>{s.clFailWr}% WR</span></div>
+              <div style={{height:8,background:G.border,borderRadius:4}}><div style={{height:"100%",width:s.clFailWr+"%",background:G.red,borderRadius:4}}/></div>
+            </div>
+            <div style={{fontSize:11,color:G.muted,marginTop:10}}>Trades with full checklist: <strong style={{color:G.text}}>{s.wp.filter(t=>t.checklist?.filter(Boolean).length===3).length}</strong></div>
+          </>):<div style={{fontSize:12,color:G.muted}}>No data yet</div>}
+        </Card>
+      </div>
+
+      {s&&(
+        <>
+          <Card style={{padding:18}}>
+            <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>Equity Curve</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={s.equity}>
+                <defs><linearGradient id="eq" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={G.accent} stopOpacity={.3}/><stop offset="95%" stopColor={G.accent} stopOpacity={0}/></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={G.border}/>
+                <XAxis dataKey="date" tick={{fill:G.muted,fontSize:10}} tickLine={false}/>
+                <YAxis tick={{fill:G.muted,fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>"$"+v}/>
+                <Tooltip formatter={v=>[money(v),"Equity"]} contentStyle={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:8,fontSize:12}}/>
+                <Area type="monotone" dataKey="v" stroke={G.accent} fill="url(#eq)" strokeWidth={2} dot={false}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:12}}>
+            <Card style={{padding:18}}>
+              <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>Daily P&L</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={s.daily}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={G.border}/>
+                  <XAxis dataKey="date" tick={{fill:G.muted,fontSize:10}} tickLine={false}/>
+                  <YAxis tick={{fill:G.muted,fontSize:10}} tickLine={false} axisLine={false} tickFormatter={v=>"$"+v}/>
+                  <Tooltip formatter={v=>[money(v),"P&L"]} contentStyle={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:8,fontSize:12}}/>
+                  <ReferenceLine y={0} stroke={G.border}/>
+                  <Bar dataKey="v" radius={[4,4,0,0]}>{s.daily.map((d,i)=><Cell key={i} fill={d.v>=0?G.green:G.red}/>)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+            <Card style={{padding:18}}>
+              <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>By Sector</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={s.bySec} dataKey="P" nameKey="name" cx="50%" cy="50%" outerRadius={70} paddingAngle={2}>
+                    {s.bySec.map((d,i)=><Cell key={i} fill={COLS[i%COLS.length]}/>)}
+                  </Pie>
+                  <Tooltip formatter={(v,n)=>[money(v),n]} contentStyle={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:8,fontSize:12}}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRADES TAB
+// ═══════════════════════════════════════════════════════════
+function TradesTab({trades,onEdit,onDelete,onAdd,onChart,onReview}) {
+  const [fSym,setFSym]=useState("");
+  const [fSide,setFSide]=useState("All");
+  const [fRes,setFRes]=useState("All");
+  const [sortK,setSortK]=useState("date");
+  const [sortD,setSortD]=useState(-1);
+  const [exp,setExp]=useState(null);
+  const [del,setDel]=useState(null);
+
+  const rows=useMemo(()=>{
+    let t=trades.map(t=>({...t,P:pnl(t)}));
+    if(fSym) t=t.filter(x=>x.symbol.toLowerCase().includes(fSym.toLowerCase()));
+    if(fSide!=="All") t=t.filter(x=>x.side===fSide);
+    if(fRes==="Win") t=t.filter(x=>x.P>0);
+    if(fRes==="Loss") t=t.filter(x=>x.P<0);
+    t.sort((a,b)=>{const av=a[sortK],bv=b[sortK];return(typeof av==="string"?av.localeCompare(bv):av-bv)*sortD;});
+    return t;
+  },[trades,fSym,fSide,fRes,sortK,sortD]);
+
+  const th=(label,key)=>(
+    <th onClick={()=>{if(sortK===key)setSortD(d=>-d);else{setSortK(key);setSortD(-1);}}}
+      style={{padding:"9px 12px",textAlign:"left",fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:".08em",cursor:"pointer",whiteSpace:"nowrap",userSelect:"none",borderBottom:`1px solid ${G.border}`}}>
+      {label}{sortK===key?(sortD>0?" ↑":" ↓"):""}
+    </th>
+  );
+
+  const expanded=rows.find(t=>t.id===exp);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {del&&<Confirm text={`Delete ${del.side} ${del.symbol} ${del.date} — ${money(del.P)}?`} onOk={()=>{onDelete(del.id);setDel(null);if(exp===del.id)setExp(null);}} onCancel={()=>setDel(null)}/>}
+
+      <Card style={{padding:"12px 14px"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <input placeholder="Symbol…" value={fSym} onChange={e=>setFSym(e.target.value.toUpperCase())}
+            style={{background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"7px 12px",color:G.text,fontSize:13,outline:"none",width:110,fontFamily:"monospace"}}/>
+          {["All","Long","Short"].map(s=><button key={s} onClick={()=>setFSide(s)} style={{padding:"7px 12px",borderRadius:8,border:`1px solid ${fSide===s?G.accent:G.border}`,background:fSide===s?G.accent+"22":"transparent",color:fSide===s?G.accent:G.muted,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>{s}</button>)}
+          {["All","Win","Loss"].map(r=><button key={r} onClick={()=>setFRes(r)} style={{padding:"7px 12px",borderRadius:8,border:`1px solid ${fRes===r?(r==="Win"?G.green:r==="Loss"?G.red:G.accent):G.border}`,background:fRes===r?(r==="Win"?G.green:r==="Loss"?G.red:G.accent)+"22":"transparent",color:fRes===r?(r==="Win"?G.green:r==="Loss"?G.red:G.accent):G.muted,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit"}}>{r}</button>)}
+          <span style={{fontSize:12,color:G.muted,marginLeft:"auto"}}>{rows.length} trades · <span style={{color:rows.reduce((a,t)=>a+t.P,0)>=0?G.green:G.red,fontWeight:700}}>{money(rows.reduce((a,t)=>a+t.P,0))}</span></span>
+          <Btn sm onClick={onAdd}>+ Log Trade</Btn>
+        </div>
+      </Card>
+
+      <Card style={{overflow:"hidden"}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>
+              {th("Date","date")}{th("Symbol","symbol")}{th("Side","side")}
+              {th("Entry","entry")}{th("Exit","exit")}{th("Qty","qty")}
+              {th("P&L","P")}{th("R","r")}{th("SL","stopLoss")}{th("TP","takeProfit")}{th("Strategy","strategy")}
+              <th style={{padding:"9px 12px",textAlign:"center",fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",borderBottom:`1px solid ${G.border}`,whiteSpace:"nowrap"}}>CL</th>
+              <th style={{padding:"9px 12px",textAlign:"center",fontSize:10,color:G.muted,fontWeight:700,textTransform:"uppercase",borderBottom:`1px solid ${G.border}`,whiteSpace:"nowrap"}}>Actions</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(t=>(
+                <tr key={t.id} onClick={()=>setExp(exp===t.id?null:t.id)}
+                  style={{borderBottom:`1px solid ${G.border}`,cursor:"pointer",background:exp===t.id?G.accent+"09":"transparent",transition:"background .15s"}}>
+                  <td style={{padding:"10px 12px",fontSize:11,fontFamily:"monospace",color:G.muted}}>{t.date}</td>
+                  <td style={{padding:"10px 12px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{fontWeight:800,color:G.accent,fontSize:14}}>{t.symbol}</span>
+                      <button onClick={e=>{e.stopPropagation();onChart(t.symbol)}} style={{background:G.accent+"22",border:`1px solid ${G.accent}44`,borderRadius:5,padding:"1px 6px",color:G.accent,cursor:"pointer",fontSize:9,fontWeight:700,fontFamily:"inherit"}}>TV</button>
+                    </div>
+                  </td>
+                  <td style={{padding:"10px 12px"}}><Badge label={t.side} color={t.side==="Long"?G.green:G.red} sm/></td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:12}}>${t.entry}</td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:12}}>${t.exit}</td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:12}}>{t.qty}</td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontWeight:700,fontSize:13,color:t.P>=0?G.green:G.red}}>{money(t.P)}</td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:12,color:G.purple}}>{t.r?t.r+"R":"—"}</td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:12,color:G.red}}>{t.stopLoss?"$"+t.stopLoss:"—"}</td>
+                  <td style={{padding:"10px 12px",fontFamily:"monospace",fontSize:12,color:G.green}}>{t.takeProfit?"$"+t.takeProfit:"—"}</td>
+                  <td style={{padding:"10px 12px",fontSize:11,color:G.muted}}>{t.strategy}</td>
+                  <td style={{padding:"10px 12px",textAlign:"center",fontSize:12,color:t.checklist?.filter(Boolean).length===3?G.green:G.yellow}}>{t.checklist?.filter(Boolean).length||0}/3</td>
+                  <td style={{padding:"10px 12px",textAlign:"center",whiteSpace:"nowrap"}}>
+                    <button onClick={e=>{e.stopPropagation();onEdit(t)}} style={{background:"transparent",border:`1px solid ${G.border}`,borderRadius:6,padding:"4px 10px",color:G.muted,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit",marginRight:4}}>✏️</button>
+                    <button onClick={e=>{e.stopPropagation();onReview(t)}} style={{background:G.purple+"18",border:`1px solid ${G.purple}44`,borderRadius:6,padding:"4px 10px",color:G.purple,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit",marginRight:4}}>🤖</button>
+                    <button onClick={e=>{e.stopPropagation();setDel(t)}} style={{background:G.red+"18",border:`1px solid ${G.red}44`,borderRadius:6,padding:"4px 10px",color:G.red,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length===0&&<div style={{textAlign:"center",padding:48,color:G.muted,fontSize:14}}>No trades match your filters.</div>}
+        </div>
+      </Card>
+
+      {expanded&&(
+        <Card style={{padding:18}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:20,fontWeight:800,color:G.accent}}>{expanded.symbol}</span>
+              <Badge label={expanded.side} color={expanded.side==="Long"?G.green:G.red}/>
+              <span style={{fontSize:12,color:G.muted}}>{expanded.strategy} · {expanded.sector} · {expanded.session}</span>
+            </div>
+            <span style={{fontSize:20,fontWeight:800,fontFamily:"monospace",color:expanded.P>=0?G.green:G.red}}>{money(expanded.P)}</span>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+            <Btn sm ghost onClick={()=>onChart(expanded.symbol)}>📊 TV Chart</Btn>
+            <Btn sm ghost onClick={()=>onEdit(expanded)}>✏️ Edit</Btn>
+            <Btn sm ghost color={G.purple} onClick={()=>onReview(expanded)}>🤖 AI Review</Btn>
+            <Btn sm danger onClick={()=>setDel(expanded)}>🗑️ Delete</Btn>
+          </div>
+          <div style={{display:"flex",gap:16,marginBottom:expanded.notes||expanded.screenshot?12:0,flexWrap:"wrap"}}>
+            {[["Entry","$"+expanded.entry],["Exit","$"+expanded.exit],["Qty",expanded.qty],["Fees","$"+(expanded.fees||0)],["R",expanded.r?expanded.r+"R":"—"],["Stop Loss",expanded.stopLoss?"$"+expanded.stopLoss:"—"],["Take Profit",expanded.takeProfit?"$"+expanded.takeProfit:"—"],["Checklist",(expanded.checklist?.filter(Boolean).length||0)+"/3"]].map(([l,v])=>(
+              <div key={l}><div style={{fontSize:10,color:G.muted,fontWeight:700}}>{l}</div><div style={{fontSize:14,fontWeight:700,fontFamily:"monospace",color:l==="Stop Loss"?G.red:l==="Take Profit"?G.green:G.text}}>{v}</div></div>
+            ))}
+          </div>
+          {expanded.reason&&<div style={{fontSize:13,color:G.text,padding:"8px 12px",background:G.accent+"12",borderRadius:8,borderLeft:`3px solid ${G.accent}`,marginBottom:10}}>💡 <strong>Reason:</strong> {expanded.reason}</div>}
+          {expanded.notes&&<div style={{fontSize:13,color:G.muted,padding:"8px 12px",background:G.panel2,borderRadius:8,borderLeft:`3px solid ${G.border}`,marginBottom:10}}>📝 {expanded.notes}</div>}
+          {expanded.tags?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{expanded.tags.map(t=><Badge key={t} label={t} sm/>)}</div>}
+          {expanded.screenshot&&<img src={expanded.screenshot} alt="screenshot" style={{maxWidth:"100%",maxHeight:300,borderRadius:8,border:`1px solid ${G.border}`,marginTop:6}}/>}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// ANALYTICS
+// ═══════════════════════════════════════════════════════════
+function Analytics({trades}) {
+  const s=useMemo(()=>calcStats(trades),[trades]);
+  const COLS=[G.accent,G.purple,G.green,G.yellow,G.red,G.orange,G.cyan,"#ec4899","#14b8a6","#f43f5e"];
+  if(!s) return <div style={{textAlign:"center",padding:60,color:G.muted}}>No trades yet.</div>;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <Card style={{padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>P&L by Strategy</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={s.byStrat} layout="vertical">
+              <XAxis type="number" tick={{fill:G.muted,fontSize:10}} tickLine={false} tickFormatter={v=>"$"+v}/>
+              <YAxis type="category" dataKey="name" tick={{fill:G.muted,fontSize:11}} width={100}/>
+              <Tooltip formatter={v=>[money(v),"P&L"]} contentStyle={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:8,fontSize:12}}/>
+              <Bar dataKey="P" radius={[0,4,4,0]}>{s.byStrat.map((d,i)=><Cell key={i} fill={d.P>=0?G.green:G.red}/>)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card style={{padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>Win Rate by Strategy</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {s.byStrat.map(st=>(
+              <div key={st.name}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:12,color:G.muted}}>{st.name}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:+st.wr>=50?G.green:G.red}}>{st.wr}% · {st.n}T</span>
+                </div>
+                <div style={{height:7,background:G.border,borderRadius:4}}><div style={{height:"100%",width:st.wr+"%",background:+st.wr>=50?G.green:G.red,borderRadius:4,transition:"width .5s"}}/></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <Card style={{padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>P&L by Sector</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={s.bySec} dataKey="P" nameKey="name" cx="50%" cy="50%" outerRadius={80} paddingAngle={2}>
+                {s.bySec.map((d,i)=><Cell key={i} fill={COLS[i%COLS.length]}/>)}
+              </Pie>
+              <Tooltip formatter={(v,n)=>[money(v),n]} contentStyle={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:8,fontSize:12}}/>
+            </PieChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card style={{padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>R-Multiple Distribution</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" stroke={G.border}/>
+              <XAxis type="number" dataKey="i" name="Trade #" tick={{fill:G.muted,fontSize:10}}/>
+              <YAxis type="number" dataKey="r" name="R" tick={{fill:G.muted,fontSize:10}} tickFormatter={v=>v+"R"}/>
+              <ReferenceLine y={0} stroke={G.border}/>
+              <Tooltip formatter={(v,n)=>[n==="R"?v+"R":"#"+v,n]} contentStyle={{background:G.panel,border:`1px solid ${G.border}`,borderRadius:8,fontSize:12}}/>
+              <Scatter data={s.wp.filter(t=>t.r).map((t,i)=>({i:i+1,r:t.r,p:t.P}))}>
+                {s.wp.filter(t=>t.r).map((t,i)=><Cell key={i} fill={t.r>0?G.green:G.red}/>)}
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+        </Card>
+      </div>
+      <Card style={{padding:18}}>
+        <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:14}}>Full Performance Report</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1px 0"}}>
+          {[["Total Trades",trades.length,G.text],["Winning Trades",s.wins.length,G.green],["Losing Trades",s.losses.length,G.red],["Win Rate",s.wr.toFixed(2)+"%",s.wr>=50?G.green:G.red],["Net P&L",money(s.net),s.net>=0?G.green:G.red],["Profit Factor",isFinite(s.pf)?s.pf.toFixed(3):"∞",s.pf>=1.5?G.green:G.yellow],["Avg Win",money(s.avgW),G.green],["Avg Loss",money(s.avgL),G.red],["Gross Profit",money(s.gW),G.green],["Gross Loss",money(-s.gL),G.red],["Avg R-Multiple",s.avgR.toFixed(2)+"R",s.avgR>0?G.green:G.red],["Max Drawdown",money(-s.dd),G.red],["Checklist 3/3 WR",s.clPassWr+"%",+s.clPassWr>=50?G.green:G.red],["Checklist <3 WR",s.clFailWr+"%",+s.clFailWr>=50?G.green:G.red]].map(([label,val,color])=>(
+            <div key={label} style={{display:"flex",justifyContent:"space-between",padding:"7px 14px",background:G.panel2,borderBottom:`1px solid ${G.border}`}}>
+              <span style={{fontSize:12,color:G.muted}}>{label}</span>
+              <span style={{fontSize:13,fontWeight:700,color,fontFamily:"monospace"}}>{val}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// CALENDAR
+// ═══════════════════════════════════════════════════════════
+function CalendarTab({trades}) {
+  const now=new Date();
+  const [yr,setYr]=useState(now.getFullYear());
+  const [mo,setMo]=useState(now.getMonth());
+  const [sel,setSel]=useState(null);
+  const map=useMemo(()=>{
+    const m={};
+    trades.forEach(t=>{const p=pnl(t);if(!m[t.date])m[t.date]={P:0,n:0,list:[]};m[t.date].P+=p;m[t.date].n++;m[t.date].list.push({...t,P:p});});
+    return m;
+  },[trades]);
+  const dim=new Date(yr,mo+1,0).getDate(),fd=new Date(yr,mo,1).getDay();
+  const weeks=[];let wk2=Array(fd).fill(null);
+  for(let d=1;d<=dim;d++){wk2.push(d);if(wk2.length===7){weeks.push(wk2);wk2=[];}}
+  if(wk2.length) weeks.push([...wk2,...Array(7-wk2.length).fill(null)]);
+  const mStr=`${yr}-${String(mo+1).padStart(2,"0")}`;
+  const mPnl=Object.entries(map).filter(([k])=>k.startsWith(mStr)).reduce((a,[,v])=>a+v.P,0);
+  const todayStr=now.toISOString().slice(0,10);
+  const prev=()=>mo===0?(setYr(y=>y-1),setMo(11)):setMo(m=>m-1);
+  const next=()=>mo===11?(setYr(y=>y+1),setMo(0)):setMo(m=>m+1);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <Btn ghost sm onClick={prev}>‹ Prev</Btn>
+          <span style={{fontWeight:700,fontSize:17,color:G.text,minWidth:200,textAlign:"center"}}>{new Date(yr,mo).toLocaleString("default",{month:"long",year:"numeric"})}</span>
+          <Btn ghost sm onClick={next}>Next ›</Btn>
+        </div>
+        <div><div style={{fontSize:10,color:G.muted,fontWeight:700}}>MONTH P&L</div><div style={{fontSize:20,fontWeight:800,fontFamily:"monospace",color:mPnl>=0?G.green:G.red}}>{money(mPnl)}</div></div>
+      </div>
+      <Card style={{overflow:"hidden"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:`1px solid ${G.border}`}}>
+          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=><div key={d} style={{padding:"9px 0",textAlign:"center",fontSize:10,fontWeight:700,color:G.muted,textTransform:"uppercase"}}>{d}</div>)}
+        </div>
+        {weeks.map((wk3,wi)=>(
+          <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:wi<weeks.length-1?`1px solid ${G.border}`:"none"}}>
+            {wk3.map((day,di)=>{
+              const key=day?`${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`:null;
+              const data=key?map[key]:null;
+              const isT=key===todayStr,isS=key===sel;
+              return (
+                <div key={di} onClick={()=>day&&setSel(isS?null:key)}
+                  style={{minHeight:78,padding:"8px 10px",borderRight:di<6?`1px solid ${G.border}`:"none",background:isS?G.accent+"0e":"transparent",cursor:day?"pointer":"default",transition:"background .15s"}}>
+                  {day&&<>
+                    <div style={{display:"flex",justifyContent:"space-between"}}>
+                      <span style={{fontSize:12,fontWeight:700,color:isT?G.accent:G.text,background:isT?G.accent+"22":undefined,borderRadius:4,padding:isT?"1px 5px":undefined}}>{day}</span>
+                      {data&&<span style={{fontSize:9,color:G.muted}}>{data.n}T</span>}
+                    </div>
+                    {data&&<><div style={{fontSize:11,fontWeight:800,color:data.P>=0?G.green:G.red,fontFamily:"monospace",marginTop:4}}>{money(data.P)}</div><div style={{marginTop:4,height:3,borderRadius:2,background:data.P>=0?G.green:G.red,opacity:.6,width:Math.min(100,Math.abs(data.P)/4)+"%",minWidth:14}}/></>}
+                  </>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </Card>
+      {sel&&map[sel]&&(
+        <Card style={{padding:18}}>
+          <div style={{fontWeight:700,fontSize:14,color:G.text,marginBottom:12}}>{new Date(sel+"T12:00:00").toLocaleDateString("default",{weekday:"long",year:"numeric",month:"long",day:"numeric"})} — {money(map[sel].P)}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {map[sel].list.map(t=>(
+              <div key={t.id} style={{display:"flex",gap:12,alignItems:"center",padding:"10px 14px",background:G.panel2,borderRadius:8,border:`1px solid ${G.border}`}}>
+                <Badge label={t.side} color={t.side==="Long"?G.green:G.red} sm/>
+                <span style={{fontWeight:800,color:G.accent}}>{t.symbol}</span>
+                <span style={{fontSize:12,color:G.muted}}>{t.strategy}</span>
+                <span style={{fontSize:12,color:G.muted,fontFamily:"monospace"}}>{t.entry}→{t.exit}×{t.qty}</span>
+                <span style={{marginLeft:"auto",fontWeight:800,fontFamily:"monospace",color:t.P>=0?G.green:G.red}}>{money(t.P)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// JOURNAL
+// ═══════════════════════════════════════════════════════════
+function JournalTab({trades,onChart,onReview}) {
+  const list=useMemo(()=>[...trades].sort((a,b)=>b.date.localeCompare(a.date)),[trades]);
+  if(!list.length) return <div style={{textAlign:"center",padding:60,color:G.muted}}>No journal entries yet.</div>;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {list.map(t=>{
+        const P=pnl(t);
+        return (
+          <Card key={t.id} style={{padding:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontWeight:800,fontSize:18,color:G.accent}}>{t.symbol}</span>
+                <Badge label={t.side} color={t.side==="Long"?G.green:G.red}/>
+                <span style={{fontSize:12,color:G.muted}}>{t.strategy}</span>
+                <span style={{fontSize:11,color:t.checklist?.filter(Boolean).length===3?G.green:G.yellow}}>{t.checklist?.filter(Boolean).length||0}/3 ✓</span>
+                <button onClick={()=>onChart(t.symbol)} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${G.accent}44`,background:G.accent+"18",color:G.accent,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>📊 Chart</button>
+                <button onClick={()=>onReview(t)} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${G.purple}44`,background:G.purple+"18",color:G.purple,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"inherit"}}>🤖 AI Review</button>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:18,fontWeight:800,fontFamily:"monospace",color:P>=0?G.green:G.red}}>{money(P)}</div>
+                <div style={{fontSize:11,color:G.muted}}>{t.date}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:18,fontSize:12,color:G.muted,marginBottom:t.notes||t.screenshot?10:0,flexWrap:"wrap"}}>
+              <span>Entry <strong style={{color:G.text,fontFamily:"monospace"}}>${t.entry}</strong></span>
+              <span>Exit <strong style={{color:G.text,fontFamily:"monospace"}}>${t.exit}</strong></span>
+              <span>Qty <strong style={{color:G.text,fontFamily:"monospace"}}>{t.qty}</strong></span>
+              {t.r&&<span>R <strong style={{color:G.purple,fontFamily:"monospace"}}>{t.r}R</strong></span>}
+              <span>Sector <strong style={{color:G.text}}>{t.sector}</strong></span>
+            </div>
+            {t.reason&&<div style={{fontSize:13,color:G.text,padding:"8px 12px",background:G.accent+"12",borderRadius:8,borderLeft:`3px solid ${G.accent}`,marginBottom:8}}>💡 <strong>Reason:</strong> {t.reason}</div>}
+            {(t.stopLoss||t.takeProfit)&&(
+              <div style={{display:"flex",gap:16,marginBottom:8,padding:"8px 12px",background:G.panel2,borderRadius:8,border:`1px solid ${G.border}`}}>
+                {t.stopLoss&&<div><span style={{fontSize:10,color:G.muted,fontWeight:700}}>STOP LOSS </span><span style={{fontFamily:"monospace",fontWeight:700,color:G.red}}>${t.stopLoss}</span></div>}
+                {t.takeProfit&&<div><span style={{fontSize:10,color:G.muted,fontWeight:700}}>TAKE PROFIT </span><span style={{fontFamily:"monospace",fontWeight:700,color:G.green}}>${t.takeProfit}</span></div>}
+                {t.stopLoss&&t.takeProfit&&<div><span style={{fontSize:10,color:G.muted,fontWeight:700}}>R:R </span><span style={{fontFamily:"monospace",fontWeight:700,color:G.yellow}}>{(Math.abs(t.takeProfit-t.entry)/Math.abs(t.stopLoss-t.entry)).toFixed(2)}:1</span></div>}
+              </div>
+            )}
+            {t.notes&&<div style={{fontSize:13,color:G.muted,padding:"8px 12px",background:G.panel2,borderRadius:8,borderLeft:`3px solid ${G.border}`,marginBottom:8}}>📝 {t.notes}</div>}
+            {t.tags?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:t.screenshot?10:0}}>{t.tags.map(tag=><Badge key={tag} label={tag} sm/>)}</div>}
+            {t.screenshot&&<img src={t.screenshot} alt="chart" style={{maxWidth:"100%",maxHeight:220,borderRadius:8,border:`1px solid ${G.border}`,marginTop:4}}/>}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════
+function Settings({cfg,onSave}) {
+  const [f,setF]=useState(cfg);
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const [saved,setSaved]=useState(false);
+  const save=()=>{ onSave(f); setSaved(true); setTimeout(()=>setSaved(false),2000); };
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16,maxWidth:600}}>
+      <Card style={{padding:20}}>
+        <div style={{fontSize:14,fontWeight:700,color:G.text,marginBottom:14}}>🔑 API Keys</div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div>
+            <label style={{fontSize:11,color:G.muted,fontWeight:700,display:"block",marginBottom:6}}>FINNHUB API KEY (for live prices)</label>
+            <input value={f.finnhubKey||""} onChange={e=>set("finnhubKey",e.target.value)} placeholder="Enter your Finnhub API key…" type="password"
+              style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,fontFamily:"monospace",outline:"none",boxSizing:"border-box"}}/>
+            <div style={{fontSize:11,color:G.muted,marginTop:5}}>Get a free key at <a href="https://finnhub.io" target="_blank" rel="noreferrer" style={{color:G.accent}}>finnhub.io</a> — 60 calls/min free tier</div>
+          </div>
+        </div>
+      </Card>
+      <Card style={{padding:20}}>
+        <div style={{fontSize:14,fontWeight:700,color:G.text,marginBottom:14}}>⚙️ Account Settings</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div>
+            <label style={{fontSize:11,color:G.muted,fontWeight:700,display:"block",marginBottom:6}}>DEFAULT ACCOUNT SIZE ($)</label>
+            <input type="number" value={f.accountSize||5000} onChange={e=>set("accountSize",+e.target.value)}
+              style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,fontFamily:"monospace",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:G.muted,fontWeight:700,display:"block",marginBottom:6}}>DEFAULT RISK PER TRADE (%)</label>
+            <input type="number" value={f.riskPct||2} onChange={e=>set("riskPct",+e.target.value)} min={0.5} max={5} step={0.5}
+              style={{width:"100%",background:"var(--input)",border:`1px solid ${G.border}`,borderRadius:8,padding:"9px 12px",color:G.text,fontSize:13,fontFamily:"monospace",outline:"none",boxSizing:"border-box"}}/>
+          </div>
+        </div>
+      </Card>
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <Btn onClick={save} color={saved?G.green:G.accent}>{saved?"✓ Saved!":"Save Settings"}</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════
+const MAIN_TABS=[
+  {id:"dashboard",icon:"📊",label:"Dashboard"},
+  {id:"trades",   icon:"📋",label:"Trades"},
+  {id:"watchlist",icon:"👁️",label:"Watchlist"},
+  {id:"analytics",icon:"📈",label:"Analytics"},
+  {id:"calendar", icon:"📅",label:"Calendar"},
+  {id:"journal",  icon:"📝",label:"Journal"},
+  {id:"playbook", icon:"📚",label:"Playbook"},
+  {id:"weekly",   icon:"📆",label:"Weekly Review"},
+  {id:"tools",    icon:"🛠️",label:"Tools"},
+  {id:"settings", icon:"⚙️",label:"Settings"},
+];
+
+function App() {
+  const [trades,  setTrades]  = useState([]);
+  const [watch,   setWatch]   = useState([]);
+  const [play,    setPlay]    = useState([]);
+  const [cfg,     setCfg]     = useState({finnhubKey:"",accountSize:5000,riskPct:2});
+  const [tab,     setTab]     = useState("dashboard");
+  const [modal,   setModal]   = useState(null);
+  const [chart,   setChart]   = useState(null);
+  const [aiTrade, setAiTrade] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [theme,   setTheme]   = useState("dark");
+  const fg = useFearGreed();
+
+  useEffect(()=>{
+    Promise.all([
+      stor(SK.trades),
+      stor(SK.watchlist),
+      stor(SK.playbook),
+      stor(SK.settings),
+      stor("tlp-theme"),
+    ]).then(([t,w,p,c,th])=>{
+      setTrades(t||SEED);
+      setWatch(w||[]);
+      setPlay(p||[]);
+      setCfg(c||{finnhubKey:"",accountSize:5000,riskPct:2});
+      if(th) setTheme(th);
+      setLoading(false);
+    });
+  },[]);
+
+  const saveTrades  = useCallback(next=>{setTrades(next);stor(SK.trades,next);},[]);
+  const saveWatch   = useCallback(next=>{setWatch(next);stor(SK.watchlist,next);},[]);
+  const savePlay    = useCallback(next=>{setPlay(next);stor(SK.playbook,next);},[]);
+  const saveCfg     = useCallback(next=>{setCfg(next);stor(SK.settings,next);},[]);
+
+  const addOrEdit   = useCallback(t=>{
+    saveTrades(trades.find(x=>x.id===t.id)?trades.map(x=>x.id===t.id?t:x):[...trades,t]);
+    setModal(null);
+  },[trades,saveTrades]);
+
+  const deleteTrade = useCallback(id=>saveTrades(trades.filter(t=>t.id!==id)),[trades,saveTrades]);
+  const importAll   = useCallback(list=>saveTrades([...trades,...list]),[trades,saveTrades]);
+  const deletePlay  = useCallback(id=>savePlay(play.filter(p=>p.id!==id)),[play,savePlay]);
+
+  const openAddWithSym = sym=>{
+    setModal({_new:true,symbol:sym});
+    setTab("trades");
+  };
+
+  const s=useMemo(()=>calcStats(trades),[trades]);
+
+  if(loading) return (
+    <div style={{background:"#080c14",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:36,marginBottom:12}}>📈</div>
+        <div style={{color:"#3b82f6",fontSize:16,fontWeight:700}}>TradeLog Pro</div>
+        <div style={{color:"#64748b",fontSize:12,marginTop:4}}>Loading your journal…</div>
+      </div>
+    </div>
+  );
+
+  const palette = theme === "dark" ? DARK : LIGHT;
+
+  return (
+    <div style={{
+      ...palette,
+      position:"fixed", inset:0, overflowY:"auto",
+      background:"var(--bg)", fontFamily:"'Segoe UI',system-ui,sans-serif",
+      color:"var(--text)", transition:"background .3s,color .25s"
+    }}>
+      <style>{`
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-track{background:var(--scrollbar-track)}
+        ::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:3px}
+        input,select,textarea{font-family:inherit;color-scheme:${theme}}
+        button:focus{outline:none}
+        a{transition:opacity .15s} a:hover{opacity:.8}
+      `}</style>
+
+      {/* ── HEADER ── */}
+      <div style={{background:G.panel,borderBottom:`1px solid ${G.border}`,position:"sticky",top:0,zIndex:200}}>
+        <div style={{maxWidth:1440,margin:"0 auto",padding:"0 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:10,paddingBottom:2}}>
+            {/* Logo */}
+            <div style={{display:"flex",alignItems:"center",gap:8,minWidth:160}}>
+              <div style={{width:32,height:32,background:`linear-gradient(135deg,${G.accent},${G.purple})`,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>📈</div>
+              <div>
+                <div style={{fontWeight:800,fontSize:15,letterSpacing:"-.02em",color:G.text}}>TradeLog Pro</div>
+                <div style={{fontSize:9,color:G.muted,fontWeight:600}}>+ TradingView · Finnhub · AI</div>
+              </div>
+            </div>
+
+            {/* Quick stats */}
+            <div style={{display:"flex",gap:16,padding:"6px 16px",background:G.panel2,borderRadius:10,border:`1px solid ${G.border}`}}>
+              {[
+                {label:"P&L",value:s?money(s.net):"$0",color:s?(s.net>=0?G.green:G.red):G.muted},
+                {label:"WR",value:s?s.wr.toFixed(0)+"%":"—",color:s?(s.wr>=50?G.green:G.red):G.muted},
+                {label:"PF",value:s?(isFinite(s.pf)?s.pf.toFixed(1):"∞"):"—",color:s?(s.pf>=1?G.green:G.red):G.muted},
+                {label:"Trades",value:trades.length,color:G.text},
+              ].map(x=>(
+                <div key={x.label} style={{textAlign:"center"}}>
+                  <div style={{fontSize:9,color:G.muted,fontWeight:700}}>{x.label}</div>
+                  <div style={{fontSize:14,fontWeight:800,color:x.color,fontFamily:"monospace"}}>{x.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+              {/* ── Theme Toggle ── */}
+              <button onClick={()=>{ const next=theme==="dark"?"light":"dark"; setTheme(next); stor("tlp-theme",next); }}
+                title={`Switch to ${theme==="dark"?"light":"dark"} mode`}
+                style={{width:36,height:36,borderRadius:8,border:`1px solid ${G.border}`,background:G.panel2,cursor:"pointer",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {theme==="dark"?"☀️":"🌙"}
+              </button>
+              <button onClick={()=>setModal("csv")} style={{padding:"7px 13px",borderRadius:8,border:`1px solid ${G.border}`,background:G.panel2,color:G.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>📥 Import CSV</button>
+              <button onClick={()=>setModal("pine")} style={{padding:"7px 13px",borderRadius:8,border:`1px solid ${G.purple}44`,background:G.purple+"18",color:G.purple,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>📌 Pine Script</button>
+              <button onClick={()=>setModal({_new:true})} style={{padding:"7px 18px",borderRadius:8,border:"none",background:`linear-gradient(135deg,${G.accent},${G.purple})`,color:"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:800}}>+ Log Trade</button>
+            </div>
+          </div>
+          {/* Tabs */}
+          <div style={{display:"flex",overflowX:"auto",gap:0,paddingTop:4}}>
+            {MAIN_TABS.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)}
+                style={{background:tab===t.id?G.accent+"18":"transparent",color:tab===t.id?G.accent:G.muted,border:"none",borderBottom:tab===t.id?`2px solid ${G.accent}`:"2px solid transparent",padding:"8px 14px",cursor:"pointer",fontWeight:600,fontSize:12,display:"flex",alignItems:"center",gap:4,fontFamily:"inherit",whiteSpace:"nowrap",transition:"all .2s"}}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTENT ── */}
+      <div style={{maxWidth:1440,margin:"0 auto",padding:16}}>
+        {tab==="dashboard" && <Dashboard trades={trades} fg={fg} extraEvents={[]}/>}
+        {tab==="trades"    && <TradesTab trades={trades} onEdit={t=>setModal(t)} onDelete={deleteTrade} onAdd={()=>setModal({_new:true})} onChart={s=>{setChart(s);}} onReview={t=>setAiTrade(t)}/>}
+        {tab==="watchlist" && <WatchlistTab watchlist={watch} onUpdate={saveWatch} apiKey={cfg.finnhubKey} onAddToJournal={openAddWithSym} onOpenChart={s=>setChart(s)}/>}
+        {tab==="analytics" && <Analytics trades={trades}/>}
+        {tab==="calendar"  && <CalendarTab trades={trades}/>}
+        {tab==="journal"   && <JournalTab trades={trades} onChart={s=>setChart(s)} onReview={t=>setAiTrade(t)}/>}
+        {tab==="playbook"  && <Playbook playbook={play} onSave={p=>savePlay([...play,p])} onDelete={deletePlay} onUse={p=>{setModal({_new:true,_template:p});}}/>}
+        {tab==="weekly"    && <WeeklyReview trades={trades}/>}
+        {tab==="tools"     && (
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            <Card style={{padding:20}}>
+              <div style={{fontWeight:700,fontSize:15,color:G.text,marginBottom:16}}>🧮 Position Size Calculator</div>
+              <RiskCalc initAccount={cfg.accountSize||5000}/>
+            </Card>
+          </div>
+        )}
+        {tab==="settings"  && <Settings cfg={cfg} onSave={saveCfg}/>}
+      </div>
+
+      {/* ── MODALS ── */}
+      {modal&&(modal._new||modal.id)&&(
+        <Modal title={modal.id?"Edit Trade":"Log New Trade"} onClose={()=>setModal(null)} maxW={780}>
+          <TradeForm
+            init={modal.id?modal:(modal._template?{symbol:modal.symbol||"",strategy:modal._template.strategy,side:modal._template.side,sector:modal._template.sector}:{symbol:modal.symbol||""})}
+            onSave={addOrEdit}
+            onClose={()=>setModal(null)}
+            playbook={play}
+          />
+        </Modal>
+      )}
+      {modal==="csv"  && <Modal title="📥 Import from TradingView CSV" onClose={()=>setModal(null)} wide><CSVImport onImport={importAll} onClose={()=>setModal(null)}/></Modal>}
+      {modal==="pine" && <Modal title="📌 Pine Script Export" onClose={()=>setModal(null)} wide><PineExport trades={trades} onClose={()=>setModal(null)}/></Modal>}
+      {chart && <TVChart symbol={chart} onClose={()=>setChart(null)}/>}
+      {aiTrade && <Modal title={`🤖 AI Trade Review — ${aiTrade.symbol}`} onClose={()=>setAiTrade(null)} maxW={640}><AIReview trade={aiTrade} onClose={()=>setAiTrade(null)}/></Modal>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
